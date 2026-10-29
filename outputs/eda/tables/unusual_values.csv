@@ -1,0 +1,8 @@
+,rows,pct
+Zero guests (Adults+Children+Babies == 0),167,0.21
+Zero adults,390,0.49
+Zero nights stayed,331,0.42
+ADR == 0,1208,1.52
+ADR < 0,0,0.0
+Reserved room != assigned room,7192,9.07
+IsCanceled=1 but status is Check-Out (inconsistent),0,0.0
