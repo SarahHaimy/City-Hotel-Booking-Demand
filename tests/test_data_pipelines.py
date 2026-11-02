@@ -69,8 +69,8 @@ def test_adr_outlier_removed():
 
 def test_zero_adr_flag():
     df = stack(make_df(ADR=0.0), make_df(LeadTime=11))
-    assert len(clean_data(df)[0]) == 1                          # default: kept
-    assert len(clean_data(df, drop_zero_adr=True)[0]) == 2      # dropped
+    assert len(clean_data(df)[0]) == 2                          # default: kept
+    assert len(clean_data(df, drop_zero_adr=True)[0]) == 1      # dropped
 
 
 def test_babies_to_binary_flag():
@@ -176,7 +176,7 @@ def test_full_pipeline_on_real_data():
     clean, _ = clean_data(load_h2())
     assert not clean.duplicated().any()
     assert (clean["Adults"] + clean["Children"] + clean["HasBabies"] > 0).all()
-    assert (clean["ADR"] > 0).all() and (clean["ADR"] <= MAX_ADR).all()
+    assert (clean["ADR"] >= 0).all() and (clean["ADR"] <= MAX_ADR).all()
     assert clean["Children"].notna().all()
     tr, va, te = split_data(clean)
     assert len(tr) + len(va) + len(te) == len(clean)
