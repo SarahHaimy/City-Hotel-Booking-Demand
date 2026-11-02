@@ -1,0 +1,13 @@
+column,n_unique,top_value,top_share
+ArrivalDateMonth,12,August,0.113
+Meal,4,BB,0.785
+Country,166,PRT,0.39
+MarketSegment,8,Online TA,0.488
+DistributionChannel,5,TA/TO,0.869
+ReservedRoomType,8,A,0.789
+AssignedRoomType,9,A,0.719
+DepositType,3,No Deposit,0.838
+Agent,223,9,0.403
+Company,207,,0.953
+CustomerType,4,Transient,0.749
+ReservationStatus,3,Check-Out,0.583
