@@ -25,7 +25,7 @@ def _ids_to_str(series: pd.Series) -> pd.Series:
 def clean_data(
     df: pd.DataFrame,
     drop_zero_adr: bool = False,
-    drop_company: bool = False,
+    drop_company: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     steps: list[tuple[str, int]] = []
     n_start = len(df)
