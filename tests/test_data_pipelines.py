@@ -15,7 +15,6 @@ from src.data.data_split import (load_splits, save_splits, split_data,
                                  train_val_combined)
 
 
-# helpers
 def make_df(**overrides):
     """One valid booking; any field can be overridden."""
     row = dict(IsCanceled=0, LeadTime=10, Adults=2, Children=0.0, Babies=0,
@@ -29,7 +28,6 @@ def stack(*frames):
     return pd.concat(frames, ignore_index=True)
 
 
-# cleaning
 def test_duplicates_removed():
     df = stack(make_df(), make_df(), make_df(LeadTime=11))
     out, rep = clean_data(df)
@@ -69,8 +67,8 @@ def test_adr_outlier_removed():
 
 def test_zero_adr_flag():
     df = stack(make_df(ADR=0.0), make_df(LeadTime=11))
-    assert len(clean_data(df)[0]) == 2                          # default: kept
-    assert len(clean_data(df, drop_zero_adr=True)[0]) == 1      # dropped
+    assert len(clean_data(df)[0]) == 1                          # default: dropped
+    assert len(clean_data(df, drop_zero_adr=False)[0]) == 2     # kept
 
 
 def test_babies_to_binary_flag():
@@ -101,6 +99,18 @@ def test_original_index_preserved_and_report_consistent():
     assert rep["rows_remaining"].iloc[-1] == len(out)
 
 
+def test_duplicates_created_by_dropping_company_are_removed():
+    df = stack(make_df(Company="12"), make_df(Company="34"))   # differ only in Company
+    assert len(clean_data(df, drop_company=False)[0]) == 2
+    out, rep = clean_data(df, drop_company=True)
+    assert "Company" not in out.columns and len(out) == 1
+
+
+def test_duplicates_created_by_babies_flag_are_removed():
+    df = stack(make_df(Babies=1), make_df(Babies=2))           # both -> HasBabies = 1
+    assert len(clean_data(df)[0]) == 1
+
+
 def test_input_not_mutated():
     df = make_df(Children=np.nan)
     before = df.copy()
@@ -108,7 +118,6 @@ def test_input_not_mutated():
     pd.testing.assert_frame_equal(df, before)
 
 
-# splitting
 @pytest.fixture
 def toy():
     rng = np.random.default_rng(0)
@@ -158,7 +167,6 @@ def test_save_load_roundtrip(tmp_path):
         assert pd.api.types.is_datetime64_any_dtype(back["ReservationStatusDate"])
 
 
-# real data (integration)
 needs_csv = pytest.mark.skipif(not DEFAULT_PATH.exists(), reason="data/H2.csv not found")
 
 
@@ -176,7 +184,7 @@ def test_full_pipeline_on_real_data():
     clean, _ = clean_data(load_h2())
     assert not clean.duplicated().any()
     assert (clean["Adults"] + clean["Children"] + clean["HasBabies"] > 0).all()
-    assert (clean["ADR"] >= 0).all() and (clean["ADR"] <= MAX_ADR).all()
+    assert (clean["ADR"] > 0).all() and (clean["ADR"] <= MAX_ADR).all()
     assert clean["Children"].notna().all()
     tr, va, te = split_data(clean)
     assert len(tr) + len(va) + len(te) == len(clean)
