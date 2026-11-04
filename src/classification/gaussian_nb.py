@@ -102,3 +102,17 @@ from sklearn.metrics import accuracy_score
 
 accuracy = accuracy_score(y_val, y_pred)
 print("Validation accuracy:", round(accuracy, 4))
+from sklearn.metrics import (
+    precision_score, recall_score, f1_score,
+    roc_auc_score, confusion_matrix,
+)
+
+cancel_prob = model.predict_proba(X_val_ready)[:, 1]
+
+print(f"Precision: {precision_score(y_val, y_pred, zero_division=0):.2%}")
+print(f"Recall:    {recall_score(y_val, y_pred, zero_division=0):.2%}")
+print(f"F1-score:  {f1_score(y_val, y_pred, zero_division=0):.2%}")
+print(f"ROC-AUC:   {roc_auc_score(y_val, cancel_prob):.4f}")
+
+tn, fp, fn, tp = confusion_matrix(y_val, y_pred, labels=[0, 1]).ravel()
+print(f"TN = {tn}, FP = {fp}, FN = {fn}, TP = {tp}")
