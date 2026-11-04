@@ -85,3 +85,20 @@ X_val_ready = np.hstack([
 
 print("Final training shape:", X_train_ready.shape)
 print("Final validation shape:", X_val_ready.shape)
+
+from sklearn.naive_bayes import GaussianNB
+
+model = GaussianNB()
+model.fit(X_train_ready, y_train)
+
+print("Baseline GaussianNB trained successfully!")
+
+y_pred = model.predict(X_val_ready)
+
+print("First 10 predictions:", y_pred[:10])
+print("First 10 actual answers:", y_val.to_numpy()[:10])
+
+from sklearn.metrics import accuracy_score
+
+accuracy = accuracy_score(y_val, y_pred)
+print("Validation accuracy:", round(accuracy, 4))
