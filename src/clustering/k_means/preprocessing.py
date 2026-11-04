@@ -1,8 +1,8 @@
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, OneHotEncoder, FunctionTransformer
-from src.clustering.k_means.audit_functions import *
-from src.clustering.k_means.features import *
+from src.clustering.k_means.audit_functions import audit_features
+from src.clustering.k_means.features import get_feature_frame
 import numpy as np
 
 def build_preprocessor(fs: dict) -> ColumnTransformer:
@@ -22,8 +22,3 @@ def build_preprocessor(fs: dict) -> ColumnTransformer:
         ))
     return ColumnTransformer(transformers)
 
-# Usage
-X_raw, fs = get_feature_frame(df_clean, set_name="B")
-audit_features(X_raw, fs)
-prep = build_preprocessor(fs)
-X = prep.fit_transform(X_raw)
