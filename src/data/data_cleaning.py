@@ -39,6 +39,7 @@ def clean_data(
     df: pd.DataFrame,
     drop_zero_adr: bool = True,
     drop_company: bool = True,
+    keep_zero_nights: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Apply the cleaning rules in a fixed order.
@@ -85,7 +86,8 @@ def clean_data(
     # 4. zero-night stays that were NOT cancelled (a cancelled 0-night booking is plausible)
     n = len(out)
     nights = out["StaysInWeekendNights"] + out["StaysInWeekNights"]
-    out = out[~((nights == 0) & (out["IsCanceled"] == 0))]
+    if not keep_zero_nights:
+        out = out[~((nights == 0) & (out["IsCanceled"] == 0))]
     log("zero nights & not canceled", n, len(out))
 
     # 5. ADR anomalies
