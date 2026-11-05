@@ -8,7 +8,7 @@ from src.clustering.k_means.preprocessing import build_preprocessor
 SEED = 42
 
 
-def build_cluster_pipeline(fs, k=3, n_components=None, kmeans_params=None):
+def build_cluster_pipeline(fs, k=3, n_components=0.9, kmeans_params=None):
     """n_components=None -> no PCA (baseline); 0.90 -> keep 90% variance."""
     kmeans_params = kmeans_params or dict(init="k-means++", n_init=10, max_iter=300,
                                           tol=1e-4, algorithm="lloyd")

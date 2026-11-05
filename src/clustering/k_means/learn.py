@@ -1,8 +1,8 @@
 """Baseline K-means (sklearn) for Task C: clustering.
 
 Run from the project root:
-    python -m src.clustering.k_means.cluster
-    python -m src.clustering.k_means.cluster --feature-set B --k 3
+    python -m src.clustering.k_means.cluster --pca none
+    python -m src.clustering.k_means.cluster --pca 0.90 --k 3
 """
 import argparse
 import json
@@ -102,65 +102,68 @@ def plot_pca_2d(X, labels, path):
 #     return model, time.perf_counter() - t0
 
 
-def run_baseline(feature_set="B", k=3):
+def run_baseline(k=3, n_components = None):
     for d in (ARTIFACTS_DIR, FIG_DIR, TABLE_DIR):
-        d.mkdir(parents=True, exist_ok=True)
+         d.mkdir(parents=True, exist_ok=True)
+
+    # file-name tag so the no-PCA and PCA runs don't overwrite each other
+    tag = "nopca" if n_components is None else f"pca{int(round(n_components * 100))}"
 
     # 1. data: shared cleaning, NO train/test split (unsupervised task)
     df_clean, report = clean_data(load_h2())
     print(report.to_string(index=False))
 
     # 2. features (the leakage guard lives inside get_feature_frame)
-    X_raw, fs = get_feature_frame(df_clean, set_name=feature_set)
-    # audit_features(X_raw, fs)
+    X_raw, fs = get_feature_frame(df_clean)
 
     # 3-4. pipeline: prep -> (PCA) -> KMeans
-    pipe = build_cluster_pipeline(fs, k=k, n_components=0.9)   # 0.9 = 90% variance
+    pipe = build_cluster_pipeline(fs, k=k, n_components=n_components)
     t0 = time.perf_counter()
     pipe.fit(X_raw)
     secs = time.perf_counter() - t0
 
     model = pipe.named_steps["kmeans"]
     X = pipe[:-1].transform(X_raw)       # the matrix KMeans actually clustered on
-    params = model.get_params()
-    print(f"\nFeature set {feature_set}: {X_raw.shape[1]} raw -> "
+    print(f"\nFeatures: {X_raw.shape[1]} raw -> "
           f"{X.shape[1]} model columns, {X.shape[0]} rows")
-    
-    # 5. unsupervised metrics
+
+    # 5. unsupervised metrics (computed in the space KMeans clustered in)
     metrics = evaluate(X, model, secs)
-    metrics.update({"feature_set": feature_set, "config": "baseline", "params": params})
-    print(json.dumps(metrics, indent=2))
+    pca_info = {"pca_n_components": n_components}
+    if n_components is not None:
+        pca = pipe.named_steps["pca"]
+        pca_info["pca_components_kept"] = int(pca.n_components_)
+        pca_info["pca_variance_kept"] = float(pca.explained_variance_ratio_.sum())
+    metrics.update({"config": "baseline", "params": model.get_params(), **pca_info})
 
     # 6. interpretation
     profile = cluster_profile(X_raw, model.labels_, fs)
     print("\nCluster profile:\n", profile.to_string())
-    profile.to_csv(TABLE_DIR / "kmeans_baseline_profile.csv")
+    profile.to_csv(TABLE_DIR / f"kmeans_baseline_{tag}_profile.csv")
 
     cancel = posthoc_cancel_rate(df_clean, X_raw, model.labels_)
     print("\nPost-hoc cancel rate per cluster (leakage check only):\n", cancel)
-    cancel.to_csv(TABLE_DIR / "kmeans_baseline_cancel_rate.csv")
+    cancel.to_csv(TABLE_DIR / f"kmeans_baseline_{tag}_cancel_rate.csv")
 
     metrics["pca_explained_variance_2d"] = plot_pca_2d(
-        X, model.labels_, FIG_DIR / "kmeans_baseline_pca.png")
-    
-    metrics.update({"feature_set": feature_set, "config": "baseline", "params": params,
-                "pca_n_components": 0.90,
-                "pca_components_kept": int(pipe.named_steps["pca"].n_components_),
-                "pca_variance_kept": float(pipe.named_steps["pca"].explained_variance_ratio_.sum())})
+        X, model.labels_, FIG_DIR / f"kmeans_baseline_{tag}_pca.png")
+
+    print(json.dumps(metrics, indent=2))
 
     # 7. save results and artifacts
-    with open(TABLE_DIR / "kmeans_baseline_metrics.json", "w") as f:
+    with open(TABLE_DIR / f"kmeans_baseline_{tag}_metrics.json", "w") as f:
         json.dump(metrics, f, indent=2)
     pd.Series(model.labels_, index=X_raw.index, name="cluster").to_csv(
-        TABLE_DIR / "kmeans_baseline_labels.csv")
-    joblib.dump(pipe, ARTIFACTS_DIR / "kmeans_baseline_pipeline.joblib")
+        TABLE_DIR / f"kmeans_baseline_{tag}_labels.csv")
+    joblib.dump(pipe, ARTIFACTS_DIR / f"kmeans_baseline_{tag}_pipeline.joblib")
     print(f"\nSaved artifacts to {ARTIFACTS_DIR}")
-    return model, prep, metrics
+    return pipe, metrics
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--feature-set", default="B", choices=["A", "B", "C"])
     ap.add_argument("--k", type=int, default=3)
+    ap.add_argument("--pca", default="none", help="'none' or a float like 0.90")
     args = ap.parse_args()
-    run_baseline(args.feature_set, args.k)
+    nc = None if args.pca == "none" else float(args.pca)
+    run_baseline(k=args.k, n_components=nc)

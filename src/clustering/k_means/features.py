@@ -8,7 +8,7 @@ POST_BOOKING_COLS = ["AssignedRoomType", "BookingChanges", "DaysInWaitingList"]
 FORBIDDEN = set(OUTCOME_COLS + OUTCOME_PROXY + POST_BOOKING_COLS)
 
 # ---- Candidate feature sets ----
-FEATURE_SETS = {
+FEATURE_SET = {
     "num": ["LeadTime", "TotalNights", "TotalGuests", "ADR", "TotalOfSpecialRequests"],
     "bin": ["HasChildren", "HasParking", "IsRepeatedGuest"],
     "cat": ["MarketSegment", "CustomerType", "Meal"],
@@ -27,7 +27,7 @@ def add_engineered_features(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 def get_feature_frame(df: pd.DataFrame):
-    fs = FEATURE_SETS
+    fs = FEATURE_SET
     cols = fs["num"] + fs["bin"] + fs["cat"]
 
     # Hard guard: fail loudly if someone adds a forbidden column
