@@ -156,7 +156,7 @@ def run_baseline(k=3, n_components = None):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--k", type=int, default=3)
-    ap.add_argument("--pca", default="none", help="'none' or a float like 0.90")
+    ap.add_argument("--pca", default="0.90", help="'none' or a float like 0.90")
     args = ap.parse_args()
     nc = None if args.pca == "none" else float(args.pca)
     run_baseline(k=args.k, n_components=nc)
