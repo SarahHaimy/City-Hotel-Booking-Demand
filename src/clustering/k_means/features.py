@@ -19,10 +19,10 @@ def add_engineered_features(df: pd.DataFrame) -> pd.DataFrame:
 
     out["Children"] = pd.to_numeric(out["Children"], errors="coerce").fillna(0)
     out["TotalNights"] = out["StaysInWeekendNights"] + out["StaysInWeekNights"]
-    out["TotalGuests"] = out["Adults"] + out["Children"] + out["Babies"]
-    out["HasChildren"] = ((out["Children"] + out["Babies"]) > 0).astype(int)
+    out["TotalGuests"] = out["Adults"] + out["Children"] + out["HasBabies"]
+    out["HasChildren"] = ((out["Children"] + out["HasBabies"]) > 0).astype(int)
     out["HasParking"]  = (out["RequiredCarParkingSpaces"] > 0).astype(int)
-    out["IsDomestic"]  = (out["Country"] == "PRT").astype(int)   # under review, might remove
+    # out["IsDomestic"]  = (out["Country"] == "PRT").astype(int)   # under review, might add
     return out
 
 def get_feature_frame(df: pd.DataFrame):
