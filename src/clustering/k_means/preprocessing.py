@@ -14,13 +14,7 @@ def build_preprocessor(fs: dict) -> ColumnTransformer:
         ("num", num_pipe, fs["num"]),
         ("bin", "passthrough", fs["bin"]),
         ("cat", OneHotEncoder(handle_unknown="ignore", 
-                              min_frequency=0.01, sparse_output=False), fs["cat"]),
+         min_frequency=0.01, sparse_output=False), fs["cat"]),
     ]
-    if fs["cat"]:   # Option A has no categoricals
-        transformers.append((
-            "cat",
-            OneHotEncoder(handle_unknown="ignore", min_frequency=0.01, sparse_output=False),
-            fs["cat"],
-        ))
     return ColumnTransformer(transformers)
 

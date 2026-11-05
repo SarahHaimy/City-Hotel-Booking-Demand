@@ -23,7 +23,7 @@ from sklearn.metrics import (calinski_harabasz_score, davies_bouldin_score,
 from src.data.loader import load_h2
 from src.data.data_cleaning import clean_data
 from src.clustering.k_means.features import get_feature_frame
-from src.clustering.k_means.preprocessing import build_preprocessor
+from src.clustering.k_means.pipeline import build_cluster_pipeline
 # from src.clustering.k_means.audit_functions import audit_features   # enable once the file has content
 
 SEED = 42
@@ -95,11 +95,11 @@ def plot_pca_2d(X, labels, path):
 
 
 # -------------------------------- training ---------------------------------
-def train_kmeans(X, params):
-    """Reused by the Milestone 2 tuning loop: call it with different params."""
-    t0 = time.perf_counter()
-    model = KMeans(**params).fit(X)
-    return model, time.perf_counter() - t0
+# def train_kmeans(X, params):
+#     """Reused by the Milestone 2 tuning loop: call it with different params."""
+#     t0 = time.perf_counter()
+#     model = KMeans(**params).fit(X)
+#     return model, time.perf_counter() - t0
 
 
 def run_baseline(feature_set="B", k=3):
@@ -114,17 +114,18 @@ def run_baseline(feature_set="B", k=3):
     X_raw, fs = get_feature_frame(df_clean, set_name=feature_set)
     # audit_features(X_raw, fs)
 
-    # 3. preprocessing: fit on all clustering data
-    prep = build_preprocessor(fs)
-    X = prep.fit_transform(X_raw)
+    # 3-4. pipeline: prep -> (PCA) -> KMeans
+    pipe = build_cluster_pipeline(fs, k=k, n_components=0.9)   # 0.9 = 90% variance
+    t0 = time.perf_counter()
+    pipe.fit(X_raw)
+    secs = time.perf_counter() - t0
+
+    model = pipe.named_steps["kmeans"]
+    X = pipe[:-1].transform(X_raw)       # the matrix KMeans actually clustered on
+    params = model.get_params()
     print(f"\nFeature set {feature_set}: {X_raw.shape[1]} raw -> "
-          f"{X.shape[1]} encoded columns, {X.shape[0]} rows")
-
-    # 4. baseline: fixed, untuned settings
-    params = dict(n_clusters=k, init="k-means++", n_init=10, max_iter=300,
-                  tol=1e-4, algorithm="lloyd", random_state=SEED)
-    model, secs = train_kmeans(X, params)
-
+          f"{X.shape[1]} model columns, {X.shape[0]} rows")
+    
     # 5. unsupervised metrics
     metrics = evaluate(X, model, secs)
     metrics.update({"feature_set": feature_set, "config": "baseline", "params": params})
@@ -141,14 +142,18 @@ def run_baseline(feature_set="B", k=3):
 
     metrics["pca_explained_variance_2d"] = plot_pca_2d(
         X, model.labels_, FIG_DIR / "kmeans_baseline_pca.png")
+    
+    metrics.update({"feature_set": feature_set, "config": "baseline", "params": params,
+                "pca_n_components": 0.90,
+                "pca_components_kept": int(pipe.named_steps["pca"].n_components_),
+                "pca_variance_kept": float(pipe.named_steps["pca"].explained_variance_ratio_.sum())})
 
     # 7. save results and artifacts
     with open(TABLE_DIR / "kmeans_baseline_metrics.json", "w") as f:
         json.dump(metrics, f, indent=2)
     pd.Series(model.labels_, index=X_raw.index, name="cluster").to_csv(
         TABLE_DIR / "kmeans_baseline_labels.csv")
-    joblib.dump(prep, ARTIFACTS_DIR / "cluster_preprocessor.joblib")
-    joblib.dump(model, ARTIFACTS_DIR / "kmeans_baseline.joblib")
+    joblib.dump(pipe, ARTIFACTS_DIR / "kmeans_baseline_pipeline.joblib")
     print(f"\nSaved artifacts to {ARTIFACTS_DIR}")
     return model, prep, metrics
 
