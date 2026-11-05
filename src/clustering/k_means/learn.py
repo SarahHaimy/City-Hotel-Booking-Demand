@@ -110,6 +110,7 @@ def run_baseline(k=3, n_components = None):
 
     # full training pipeline (features -> PCA -> KMeans)
     X_raw, fs = get_feature_frame(df_clean)
+    audit_features(X_raw, fs)
     pipe = build_cluster_pipeline(fs, k=k, n_components=n_components)
     t0 = time.perf_counter()
     pipe.fit(X_raw)
