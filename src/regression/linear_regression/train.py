@@ -34,9 +34,10 @@ import time
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
-import pandas as pd
+import pandas as pd 
 import sklearn
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
@@ -60,6 +61,7 @@ from src.regression.linear_regression.features import (  # noqa: E402
 )
 from src.regression.linear_regression.linear_regression import (  # noqa: E402
     ARTIFACT_DIR,
+    BASE_OUTPUT_DIR,
     OUTPUT_DIR,
     SELECTED_CONFIG_PATH,
     SUMMARY_PATH,
@@ -68,6 +70,9 @@ from src.regression.linear_regression.linear_regression import (  # noqa: E402
     cv_rmse,
     evaluate,
     feature_names,
+    get_artifact_dir,
+    get_next_run_dir,
+    get_run_dir,
     load_selected_config,
     load_split,
     save_diagnostic_plots,
@@ -167,18 +172,22 @@ def choose_winner(results, tol: float) -> int:
 # ----------------------------------------------------------------------------
 # Variant tests
 # ----------------------------------------------------------------------------
-def run_variant_tests(train, val, tests, tol: float) -> RegressionConfig:
+def run_variant_tests(
+    train, val, tests, tol: float, output_dir: Optional[Path] = None, run_id: Optional[int] = None
+) -> RegressionConfig:
+    out_dir = Path(output_dir) if output_dir is not None else OUTPUT_DIR
     if min(tests) == 1:
         cfg = RegressionConfig()
     elif SELECTED_CONFIG_PATH.exists():
-        cfg = load_selected_config()
+        cfg = load_selected_config(run_id=run_id)
         print(f"Continuing from saved selected config: {cfg.to_dict()}")
     else:
         cfg = RegressionConfig()
         print("No saved selected config, starting from defaults.")
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+    artifact_run_dir = get_artifact_dir(run_id) if run_id is not None else None
     summary_rows = []
 
     for number in tests:
@@ -193,42 +202,55 @@ def run_variant_tests(train, val, tests, tol: float) -> RegressionConfig:
         for i, row in enumerate(rows):
             row["selected"] = i == winner
         table = pd.DataFrame(rows)
-        table.to_csv(OUTPUT_DIR / f"test{number}_{name}.csv", index=False)
+        table.to_csv(out_dir / f"test{number}_{name}.csv", index=False)
 
         cfg = replace(cfg, **options[winner][1])
-        SELECTED_CONFIG_PATH.write_text(json.dumps(cfg.to_dict(), indent=2))
+        config_json = json.dumps(cfg.to_dict(), indent=2)
+        SELECTED_CONFIG_PATH.write_text(config_json)
+        if artifact_run_dir is not None:
+            (artifact_run_dir / "selected_config.json").write_text(config_json)
         summary_rows.append({"test": number, "name": name, "winner": options[winner][0],
                              "val_RMSE": rows[winner]["val_RMSE"]})
         print(f"\nTest {number}: {name}")
         print(table.to_string(index=False, float_format=lambda v: f"{v:.4f}"))
         print(f"Winner: {options[winner][0]}\n")
 
-    pd.DataFrame(summary_rows).to_csv(OUTPUT_DIR / "variant_summary.csv", index=False)
+    pd.DataFrame(summary_rows).to_csv(out_dir / "variant_summary.csv", index=False)
     return cfg
 
 
 # ----------------------------------------------------------------------------
 # Final model
 # ----------------------------------------------------------------------------
-def train_final(cfg: RegressionConfig, train, val) -> None:
+def train_final(
+    cfg: RegressionConfig, train, val, output_dir: Optional[Path] = None, run_id: Optional[int] = None
+) -> None:
+    out_dir = Path(output_dir) if output_dir is not None else OUTPUT_DIR
     row, model, limits, val_rows, val_pred = fit_and_score(cfg, train, val)
     assert_no_leakage(feature_names(model))
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame([row]).to_csv(OUTPUT_DIR / "final_model_validation_metrics.csv", index=False)
-    coefficient_table(model).to_csv(OUTPUT_DIR / "coefficients.csv", index=False)
-    save_diagnostic_plots(val_rows[TARGET], val_pred, OUTPUT_DIR, "validation")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame([row]).to_csv(out_dir / "final_model_validation_metrics.csv", index=False)
+    coefficient_table(model).to_csv(out_dir / "coefficients.csv", index=False)
+    save_diagnostic_plots(val_rows[TARGET], val_pred, out_dir, "validation")
 
-    model_path = save_model(model)
+    model_path = save_model(model, run_id=run_id)
     summary = {
         "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "run_id": run_id,
+        "output_dir": str(out_dir),
         "sklearn_version": sklearn.__version__,
         "config": cfg.to_dict(),
         "iqr_limits": list(limits) if limits is not None else None,
         "n_train_rows": row["n_train_rows"],
         "validation_metrics": row,
     }
-    SUMMARY_PATH.write_text(json.dumps(summary, indent=2))
+    summary_json = json.dumps(summary, indent=2)
+    SUMMARY_PATH.write_text(summary_json)
+    if run_id is not None:
+        artifact_run_dir = get_artifact_dir(run_id)
+        (artifact_run_dir / "training_summary.json").write_text(summary_json)
+        (artifact_run_dir / "selected_config.json").write_text(json.dumps(cfg.to_dict(), indent=2))
 
     print("Final model, validation metrics (original ADR scale)")
     for key in ("val_MAE", "val_RMSE", "val_R2", "cv_RMSE", "train_time_s"):
@@ -240,15 +262,16 @@ def train_final(cfg: RegressionConfig, train, val) -> None:
 # ----------------------------------------------------------------------------
 # Claims to verify before the report
 # ----------------------------------------------------------------------------
-def check_claims(train, val) -> None:
+def check_claims(train, val, output_dir: Optional[Path] = None) -> None:
     """Check that season is the strongest driver and ReservedRoomType the second.
 
     Fits one-feature-group models on train and reports validation R2, and saves
     mean ADR by month and by room type (train rows)."""
+    out_dir = Path(output_dir) if output_dir is not None else OUTPUT_DIR
     train, val = paying_only(train), paying_only(val)
     eng_train, eng_val = engineer_features(train), engineer_features(val)
     y_train, y_val = train[TARGET], val[TARGET]
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     for column, order, fname in (
         ("ArrivalMonth", list(MONTH_TO_NUM), "claims_mean_adr_by_month.csv"),
@@ -256,7 +279,7 @@ def check_claims(train, val) -> None:
     ):
         table = y_train.groupby(eng_train[column]).agg(["mean", "median", "count"])
         table = table.reindex(order) if order else table.sort_values("mean", ascending=False)
-        table.to_csv(OUTPUT_DIR / fname)
+        table.to_csv(out_dir / fname)
         print(f"Mean ADR by {column}")
         print(table.to_string(float_format=lambda v: f"{v:.1f}"), "\n")
 
@@ -290,7 +313,7 @@ def check_claims(train, val) -> None:
         })
 
     table = pd.DataFrame(results).sort_values("val_R2", ascending=False)
-    table.to_csv(OUTPUT_DIR / "claims_single_feature_r2.csv", index=False)
+    table.to_csv(out_dir / "claims_single_feature_r2.csv", index=False)
     print("Validation R2 of one-feature models (higher means a stronger single driver)")
     print(table.to_string(index=False, float_format=lambda v: f"{v:.4f}"))
 
@@ -306,23 +329,33 @@ def main(argv=None) -> None:
     parser.add_argument("--tol", type=float, default=NOISE_TOL,
                         help="relative RMSE margin a later option must beat (default 0.005)")
     parser.add_argument("--claims", action="store_true", help="check the driver claims and exit")
+    parser.add_argument("--run", type=int, default=None,
+                        help="explicit run number to write to (default: auto-increment starting from 2)")
     args = parser.parse_args(argv)
 
     train, val = load_split("train"), load_split("val")
 
+    if args.run is not None:
+        run_id = args.run
+        run_dir = get_run_dir(run_id)
+    else:
+        run_id, run_dir = get_next_run_dir()
+
+    print(f"Target run directory: {run_dir} (run {run_id})")
+
     if args.claims:
-        check_claims(train, val)
+        check_claims(train, val, output_dir=run_dir)
         return
 
     if args.variants:
         tests = sorted(args.tests) if args.tests else [1, 2, 3, 4, 5]
         if args.with_optional and 6 not in tests:
             tests.append(6)
-        cfg = run_variant_tests(train, val, tests, args.tol)
+        cfg = run_variant_tests(train, val, tests, args.tol, output_dir=run_dir, run_id=run_id)
     else:
-        cfg = load_selected_config()
+        cfg = load_selected_config(run_id=run_id)
 
-    train_final(cfg, train, val)
+    train_final(cfg, train, val, output_dir=run_dir, run_id=run_id)
 
 
 if __name__ == "__main__":

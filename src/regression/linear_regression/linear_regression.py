@@ -53,11 +53,50 @@ from src.regression.linear_regression.preprocessing import (  # noqa: E402
 SEED = 42
 
 DATA_DIR = ROOT / "data" / "preprocessed"
-OUTPUT_DIR = ROOT / "outputs" / "regression" / "linear_regression"
+BASE_OUTPUT_DIR = ROOT / "outputs" / "regression" / "linear_regression"
+OUTPUT_DIR = BASE_OUTPUT_DIR
 ARTIFACT_DIR = ROOT / "artifacts" / "regression" / "linear_regression"
 MODEL_PATH = ARTIFACT_DIR / "linear_regression.joblib"
 SUMMARY_PATH = ARTIFACT_DIR / "training_summary.json"
 SELECTED_CONFIG_PATH = ARTIFACT_DIR / "selected_config.json"
+
+
+# ----------------------------------------------------------------------------
+# Output directories & run management
+# ----------------------------------------------------------------------------
+def get_next_run_dir(base_dir: Optional[Path] = None, min_run: int = 2) -> Tuple[int, Path]:
+    """Find the next incremental run number (starting at min_run) and create its directory.
+
+    Inspects base_dir for integer-named subdirectories, finds the current maximum,
+    and returns (next_run_id, base_dir / str(next_run_id)).
+    """
+    base = Path(base_dir) if base_dir is not None else BASE_OUTPUT_DIR
+    base.mkdir(parents=True, exist_ok=True)
+    existing_runs = [
+        int(p.name) for p in base.iterdir()
+        if p.is_dir() and p.name.isdigit()
+    ]
+    next_id = max(existing_runs + [min_run - 1]) + 1
+    run_dir = base / str(next_id)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    return next_id, run_dir
+
+
+def get_run_dir(run_id: Optional[int] = None, base_dir: Optional[Path] = None) -> Path:
+    """Return the directory for a specific run ID or the latest run directory if run_id is None."""
+    base = Path(base_dir) if base_dir is not None else BASE_OUTPUT_DIR
+    base.mkdir(parents=True, exist_ok=True)
+    if run_id is not None:
+        run_dir = base / str(run_id)
+        run_dir.mkdir(parents=True, exist_ok=True)
+        return run_dir
+    existing_runs = [
+        int(p.name) for p in base.iterdir()
+        if p.is_dir() and p.name.isdigit()
+    ]
+    if existing_runs:
+        return base / str(max(existing_runs))
+    return base
 
 
 # ----------------------------------------------------------------------------
@@ -216,28 +255,47 @@ def save_diagnostic_plots(y_true, y_pred, out_dir: Path, prefix: str) -> None:
 # ----------------------------------------------------------------------------
 # Persistence
 # ----------------------------------------------------------------------------
-def save_model(model) -> Path:
+def get_artifact_dir(run_id: Optional[int] = None) -> Path:
+    """Return the artifact directory for a specific run ID or root ARTIFACT_DIR."""
+    if run_id is not None:
+        path = ARTIFACT_DIR / str(run_id)
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+    ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+    return ARTIFACT_DIR
+
+
+def save_model(model, run_id: Optional[int] = None) -> Path:
+    """Save model to root ARTIFACT_DIR and optionally to run-specific artifact directory."""
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
     joblib.dump(model, MODEL_PATH)
+    if run_id is not None:
+        run_artifact_dir = get_artifact_dir(run_id)
+        joblib.dump(model, run_artifact_dir / "linear_regression.joblib")
     return MODEL_PATH
 
 
-def load_model():
-    if not MODEL_PATH.exists():
-        raise FileNotFoundError(f"{MODEL_PATH} not found. Run train.py first.")
-    return joblib.load(MODEL_PATH)
+def load_model(run_id: Optional[int] = None):
+    """Load model from run-specific artifact directory if specified, else root MODEL_PATH."""
+    target = (get_artifact_dir(run_id) / "linear_regression.joblib") if run_id is not None else MODEL_PATH
+    if not target.exists():
+        raise FileNotFoundError(f"{target} not found. Run train.py first.")
+    return joblib.load(target)
 
 
-def load_summary() -> dict:
-    if not SUMMARY_PATH.exists():
-        raise FileNotFoundError(f"{SUMMARY_PATH} not found. Run train.py first.")
-    return json.loads(SUMMARY_PATH.read_text())
+def load_summary(run_id: Optional[int] = None) -> dict:
+    """Load training summary from run-specific artifact directory if specified, else root SUMMARY_PATH."""
+    target = (get_artifact_dir(run_id) / "training_summary.json") if run_id is not None else SUMMARY_PATH
+    if not target.exists():
+        raise FileNotFoundError(f"{target} not found. Run train.py first.")
+    return json.loads(target.read_text())
 
 
-def load_selected_config() -> RegressionConfig:
-    """Config chosen by the variant tests, or the defaults if none was saved."""
-    if SELECTED_CONFIG_PATH.exists():
-        return RegressionConfig.from_dict(json.loads(SELECTED_CONFIG_PATH.read_text()))
+def load_selected_config(run_id: Optional[int] = None) -> RegressionConfig:
+    """Config chosen by the variant tests, or defaults if none was saved."""
+    target = (get_artifact_dir(run_id) / "selected_config.json") if run_id is not None else SELECTED_CONFIG_PATH
+    if target.exists():
+        return RegressionConfig.from_dict(json.loads(target.read_text()))
     return RegressionConfig()
 
 

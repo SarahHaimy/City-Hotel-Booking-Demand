@@ -1,25 +1,27 @@
 {
-  "created_at": "2026-11-05T20:47:14+00:00",
+  "created_at": "2026-11-24T22:00:39+00:00",
+  "run_id": 3,
+  "output_dir": "C:\\Users\\gioay\\Desktop\\giooo\\repos\\City-Hotel-Booking-Demand\\outputs\\regression\\linear_regression\\3",
   "sklearn_version": "1.9.1",
   "config": {
-    "log_target": true,
+    "log_target": false,
     "iqr_factor": null,
     "seasonality": "month",
     "nights": "log_share",
-    "agent_min_frequency": 10,
+    "agent_min_frequency": 50,
     "other_min_frequency": 20,
     "use_repeated_guest": true,
-    "use_prior_cancel": false
+    "use_prior_cancel": true
   },
   "iqr_limits": null,
   "n_train_rows": 36622,
   "validation_metrics": {
-    "val_MAE": 13.977382105639938,
-    "val_RMSE": 20.227737214214425,
-    "val_R2": 0.7360970736931771,
-    "cv_RMSE": 20.40256661210271,
-    "train_time_s": 0.8149570000005042,
+    "val_MAE": 14.793056881555493,
+    "val_RMSE": 20.832923711165122,
+    "val_R2": 0.7200696113516238,
+    "cv_RMSE": 20.942386865513676,
+    "train_time_s": 0.6554145000118297,
     "n_train_rows": 36622,
-    "n_features": 141
+    "n_features": 99
   }
 }
