@@ -53,8 +53,8 @@ from src.regression.linear_regression.preprocessing import (  # noqa: E402
 SEED = 42
 
 DATA_DIR = ROOT / "data" / "preprocessed"
-OUTPUT_DIR = ROOT / "outputs" / "regression" / "linear_regresssion"
-ARTIFACT_DIR = ROOT / "artifacts" / "regression" / "linear_regresssion"
+OUTPUT_DIR = ROOT / "outputs" / "regression" / "linear_regression"
+ARTIFACT_DIR = ROOT / "artifacts" / "regression" / "linear_regression"
 MODEL_PATH = ARTIFACT_DIR / "linear_regression.joblib"
 SUMMARY_PATH = ARTIFACT_DIR / "training_summary.json"
 SELECTED_CONFIG_PATH = ARTIFACT_DIR / "selected_config.json"
