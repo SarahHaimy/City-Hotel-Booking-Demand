@@ -61,7 +61,6 @@ from src.regression.linear_regression.features import (  # noqa: E402
 )
 from src.regression.linear_regression.linear_regression import (  # noqa: E402
     ARTIFACT_DIR,
-    BASE_OUTPUT_DIR,
     OUTPUT_DIR,
     SELECTED_CONFIG_PATH,
     SUMMARY_PATH,
