@@ -6,7 +6,21 @@ from typing import Any, Callable, Literal
 
 TaskType = Literal["regression", "classification", "clustering"]
 ParamKind = Literal["int", "float", "log_float", "choice", "bool"]
+OptionKind = Literal["bool", "int", "float", "str"]
 FeatureSpace = Literal["original", "pca", "lda"]
+
+
+@dataclass(frozen=True)
+class ModelOptionSpec:
+    """Model-specific CLI option exposed only for models that declare it."""
+
+    flag: str
+    dest: str
+    kind: OptionKind = "bool"
+    default: Any = False
+    choices: tuple[Any, ...] = field(default_factory=tuple)
+    help: str = ""
+    requires: str | None = None
 
 
 @dataclass(frozen=True)
@@ -45,6 +59,8 @@ class ModelSpec:
     cost_hint: Literal["fast", "medium", "slow"] = "fast"
     recommended_max_rows: int | None = None
     track_origin: Literal["milestone_1", "milestone_2_suite"] = "milestone_2_suite"
+    supported_actions: tuple[str, ...] = ("train", "tune", "evaluate")
+    cli_options: list[ModelOptionSpec] = field(default_factory=list)
 
     def default_param_dict(self) -> dict[str, Any]:
         out = {p.name: p.default for p in self.params}

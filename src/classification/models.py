@@ -25,7 +25,7 @@ from src.classification.bayes_preprocessing import (
 from src.config import SEED
 from src.data.schema import TASK_FORBIDDEN_COLUMNS
 from src.registry.registry import register_model
-from src.registry.specs import FeatureSpace, ModelSpec, ParamSpec
+from src.registry.specs import FeatureSpace, ModelOptionSpec, ModelSpec, ParamSpec
 
 CLF_FORBIDDEN = list(TASK_FORBIDDEN_COLUMNS["classification"])
 
@@ -121,5 +121,29 @@ register_model(
         supports_lda=True,
         cost_hint="fast",
         track_origin="milestone_1",
+        supported_actions=("train", "tune", "evaluate"),
+        cli_options=[
+            ModelOptionSpec(
+                flag="--calibrate",
+                dest="calibrate",
+                kind="bool",
+                default=False,
+                help="Wrap GaussianNB in 5-fold Sigmoid CalibratedClassifierCV.",
+            ),
+            ModelOptionSpec(
+                flag="--var-smoothing",
+                dest="var_smoothing",
+                kind="float",
+                default=None,
+                help="Override GaussianNB var_smoothing (e.g. 1e-5).",
+            ),
+            ModelOptionSpec(
+                flag="--threshold",
+                dest="threshold",
+                kind="float",
+                default=None,
+                help="Override classification decision threshold (0.0 to 1.0).",
+            ),
+        ],
     )
 )

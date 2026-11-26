@@ -172,7 +172,7 @@ The GUI exposes 11 integrated workspaces:
 - **Predict, Batch Evaluate & Train Studio**: Single-booking prediction + What-If simulator, CSV/XLSX batch scoring & shift-aware evaluation, and custom-data model training/tuning persisted across sessions in `artifacts/user/`.
 - **Clustering, PCA/LDA & Artifacts**: K-Means / GMM / Agglomerative (Ward dendrogram) / DBSCAN guest personas, 90% PCA scree & 1D LDA projections, bundle ZIP import/export, and background job history.
 
-See [`docs/MODEL_CONTRACT.md`](docs/MODEL_CONTRACT.md) for registering new models and [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) for the live demonstration walkthrough.
+See [`docs/MODEL_CONTRACT.md`](docs/MODEL_CONTRACT.md) for registering new models, [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) for the full CLI reference, and [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) for the live demonstration walkthrough.
 
 ### 3. Unified CLI Reference (`main.py`)
 

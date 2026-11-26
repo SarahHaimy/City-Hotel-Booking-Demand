@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
+import pandas as pd
 from sklearn.compose import TransformedTargetRegressor
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
@@ -28,7 +29,56 @@ from src.regression.linear_regression.linear_regression import (
 )
 from src.regression.linear_regression.preprocessing import build_preprocessor
 from src.registry.registry import register_model
-from src.registry.specs import FeatureSpace, ModelSpec, ParamSpec
+from src.registry.specs import FeatureSpace, ModelOptionSpec, ModelSpec, ParamSpec
+
+
+def run_linear_regression_variants(
+    train_df: pd.DataFrame,
+    val_df: pd.DataFrame,
+    with_optional: bool = False,
+    tol: float = 0.005,
+    progress_cb: Any = None,
+) -> tuple[dict[str, Any], dict[str, pd.DataFrame]]:
+    """Run Linear Regression's sequential variant ablation (Tests 1-5, optional Test 6).
+
+    Pure function: does not touch global output directories; returns (winning_params, extra_tables).
+    """
+    from dataclasses import replace
+
+    from src.regression.linear_regression.train import VARIANT_TESTS, choose_winner, fit_and_score
+
+    tests = [1, 2, 3, 4, 5, 6] if with_optional else [1, 2, 3, 4, 5]
+    cfg = RegressionConfig()
+    extra_tables: dict[str, pd.DataFrame] = {}
+    summary_rows: list[dict[str, Any]] = []
+
+    for idx, number in enumerate(tests):
+        name, options = VARIANT_TESTS[number]
+        if progress_cb:
+            progress_cb(idx / len(tests), f"Running variant test {number}/{len(tests)} ({name})…")
+        rows: list[dict[str, Any]] = []
+        for label, overrides in options:
+            row, *_ = fit_and_score(replace(cfg, **overrides), train_df, val_df)
+            rows.append({"variant": label, **row})
+
+        winner = choose_winner(rows, tol)
+        for i, row in enumerate(rows):
+            row["selected"] = i == winner
+        extra_tables[f"test{number}_{name}"] = pd.DataFrame(rows)
+        cfg = replace(cfg, **options[winner][1])
+        summary_rows.append(
+            {
+                "test": number,
+                "name": name,
+                "winner": options[winner][0],
+                "val_RMSE": rows[winner]["val_RMSE"],
+                "val_MAE": rows[winner]["val_MAE"],
+                "val_R2": rows[winner]["val_R2"],
+            }
+        )
+
+    extra_tables["variant_summary"] = pd.DataFrame(summary_rows)
+    return cfg.to_dict(), extra_tables
 
 
 def _cfg_from_params(params: dict[str, Any]) -> RegressionConfig:
@@ -121,5 +171,31 @@ register_model(
         build_pipeline=build_linear_regression_pipeline,
         cost_hint="fast",
         track_origin="milestone_1",
+        supported_actions=("train", "tune", "evaluate"),
+        cli_options=[
+            ModelOptionSpec(
+                flag="--variants",
+                dest="variants",
+                kind="bool",
+                default=False,
+                help="Run sequential 5-stage ablation variant tests before fitting the winning config.",
+            ),
+            ModelOptionSpec(
+                flag="--with-optional",
+                dest="with_optional",
+                kind="bool",
+                default=False,
+                help="Include optional Test 6 (night features) when --variants is enabled.",
+                requires="variants",
+            ),
+            ModelOptionSpec(
+                flag="--tol",
+                dest="tol",
+                kind="float",
+                default=0.005,
+                help="Relative validation RMSE improvement tolerance for --variants winner selection.",
+                requires="variants",
+            ),
+        ],
     )
 )

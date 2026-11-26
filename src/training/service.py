@@ -241,6 +241,7 @@ def train_supervised_model(
     set_as_deployed: bool = False,
     progress_cb: ProgressCallback | None = None,
     store: ArtifactStore | None = None,
+    extra_tables_override: dict[str, pd.DataFrame] | None = None,
 ) -> ArtifactBundle:
     """Train or tune any registered supervised model and persist its complete ArtifactBundle."""
     cb = progress_cb or _noop_progress
@@ -380,6 +381,8 @@ def train_supervised_model(
     weights_df = extract_feature_weights(fitted_model, X_val, y_val, scoring=spec.default_scoring)
     if weights_df is not None and not weights_df.empty:
         extra_tables["feature_weights"] = weights_df
+    if extra_tables_override:
+        extra_tables.update(extra_tables_override)
 
     # Optional final test-set evaluation
     test_metrics: dict[str, Any] = {}
@@ -399,8 +402,11 @@ def train_supervised_model(
     pca_info, n_feat_out = _extract_pca_info(fitted_model, feature_space, pca_components if feature_space == "pca" else None)
 
     if source == "user":
-        short_id = uuid.uuid4().hex[:8]
-        bundle_id = f"user/{task}_{model_id}_{variant_tag}_{short_id}"
+        if variant_override:
+            bundle_id = f"user/{task}_{model_id}_{variant_tag}"
+        else:
+            short_id = uuid.uuid4().hex[:8]
+            bundle_id = f"user/{task}_{model_id}_{variant_tag}_{short_id}"
     else:
         bundle_id = f"{task}/{model_id}/{variant_tag}"
 
@@ -475,6 +481,7 @@ def train_clustering_model(
     set_as_deployed: bool = False,
     progress_cb: ProgressCallback | None = None,
     store: ArtifactStore | None = None,
+    extra_tables_override: dict[str, pd.DataFrame] | None = None,
 ) -> ArtifactBundle:
     """Fit or optimize an unsupervised clustering algorithm and save profiles, 2D PCA, and dendrograms."""
     cb = progress_cb or _noop_progress
@@ -597,7 +604,10 @@ def train_clustering_model(
 
     pca_info, n_feat_out = _extract_pca_info(fitted_pipe, feature_space, nc)
     if source == "user":
-        bundle_id = f"user/clustering_{model_id}_{variant_tag}_{uuid.uuid4().hex[:8]}"
+        if variant_override:
+            bundle_id = f"user/clustering_{model_id}_{variant_tag}"
+        else:
+            bundle_id = f"user/clustering_{model_id}_{variant_tag}_{uuid.uuid4().hex[:8]}"
     else:
         bundle_id = f"clustering/{model_id}/{variant_tag}"
 

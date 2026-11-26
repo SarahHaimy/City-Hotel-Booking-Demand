@@ -105,8 +105,11 @@ class ArtifactStore:
         extra_tables: dict[str, pd.DataFrame] | None = None,
         extra_json: dict[str, Any] | None = None,
         set_as_deployed: bool = False,
+        replace_existing: bool = True,
     ) -> ArtifactBundle:
         bdir = self.bundle_dir_for(card)
+        if replace_existing and bdir.exists():
+            shutil.rmtree(bdir)
         bdir.mkdir(parents=True, exist_ok=True)
         extras_dir = bdir / "extras"
         extras_dir.mkdir(parents=True, exist_ok=True)

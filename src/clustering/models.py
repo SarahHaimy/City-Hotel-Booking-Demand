@@ -17,7 +17,7 @@ from src.clustering.k_means.features import FEATURE_SET, FORBIDDEN
 from src.clustering.k_means.preprocessing import build_preprocessor
 from src.config import SEED
 from src.registry.registry import register_model
-from src.registry.specs import FeatureSpace, ModelSpec, ParamSpec
+from src.registry.specs import FeatureSpace, ModelOptionSpec, ModelSpec, ParamSpec
 
 CLUSTER_RAW_INPUTS = [
     "LeadTime",
@@ -195,5 +195,23 @@ register_model(
         supports_pca=True,
         cost_hint="fast",
         track_origin="milestone_1",
+        supported_actions=("cluster",),
+        cli_options=[
+            ModelOptionSpec(
+                flag="--init",
+                dest="init",
+                kind="str",
+                default="k-means++",
+                choices=("k-means++", "random"),
+                help="K-Means centroid initialization strategy.",
+            ),
+            ModelOptionSpec(
+                flag="--n-init",
+                dest="n_init",
+                kind="int",
+                default=10,
+                help="Number of K-Means centroid initializations.",
+            ),
+        ],
     )
 )

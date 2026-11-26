@@ -26,12 +26,19 @@ ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from src.cli.interactive import run_interactive_menu  # noqa: E402
+from src.cli.runs import (  # noqa: E402
+    find_bundles_by_run_name,
+    resolve_run_name,
+    validate_model_options,
+)
 from src.data.schema import BOOKING_PRESETS  # noqa: E402
 from src.data.validation import ensure_task_splits, load_uploaded_table  # noqa: E402
 from src.evaluation.metrics import TASK_METRICS  # noqa: E402
 from src.inference.predict import predict_batch_dataframe, predict_single_booking  # noqa: E402
+from src.regression.models import run_linear_regression_variants  # noqa: E402
 from src.registry.artifacts import get_store  # noqa: E402
-from src.registry.registry import list_specs  # noqa: E402
+from src.registry.registry import get_spec, list_specs  # noqa: E402
 from src.training.service import (  # noqa: E402
     build_official_artifacts,
     evaluate_bundle_on_data,
@@ -98,6 +105,27 @@ def cmd_list_models(args: argparse.Namespace) -> int:
 
 def cmd_train(args: argparse.Namespace) -> int:
     mid = _resolve_model(args.task, args.model)
+    spec = get_spec(args.task, mid)
+    store = get_store()
+
+    provided_opts = {
+        "variants": getattr(args, "variants", False),
+        "with_optional": getattr(args, "with_optional", False),
+        "tol": getattr(args, "tol", None),
+        "calibrate": getattr(args, "calibrate", False),
+        "var_smoothing": getattr(args, "var_smoothing", None),
+        "threshold": getattr(args, "threshold", None),
+    }
+    try:
+        model_opts = validate_model_options(spec, provided_opts)
+        prefix = "variants" if model_opts.get("variants") else (
+            args.mode if args.feature_space == "original" else f"{args.mode}_{args.feature_space}"
+        )
+        run_name, _ = resolve_run_name(args.run_name, prefix=prefix, task=args.task, model_id=mid, store=store)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
     splits_arg = None
     source = "project"
     ds_name = "H2 City Hotel (official splits)"
@@ -108,25 +136,68 @@ def cmd_train(args: argparse.Namespace) -> int:
         source = "user"
         ds_name = Path(args.data).name
 
+    eff_mode = args.mode
+    custom_params: dict | None = None
+    extra_tables: dict | None = None
+
+    if mid == "linear_regression" and model_opts.get("variants"):
+        tr_v, va_v, te_v = splits_arg if splits_arg is not None else ensure_task_splits("regression")
+        tol_val = float(model_opts.get("tol", 0.005))
+        winning_params, extra_tables = run_linear_regression_variants(
+            tr_v,
+            va_v,
+            with_optional=bool(model_opts.get("with_optional", False)),
+            tol=tol_val,
+            progress_cb=lambda p, m: print(f"[variants {p * 100:5.1f}%] {m}"),
+        )
+        eff_mode = "custom"
+        custom_params = winning_params
+        splits_arg = (tr_v, va_v, te_v)
+    elif mid == "gaussian_nb" and any(
+        provided_opts[k] not in (None, False) for k in ("calibrate", "var_smoothing", "threshold")
+    ):
+        base_p = dict(spec.tuned_params if args.mode == "tuned_preset" else spec.baseline_params)
+        if provided_opts["calibrate"]:
+            base_p["calibrate"] = True
+        if provided_opts["var_smoothing"] is not None:
+            base_p["var_smoothing"] = float(provided_opts["var_smoothing"])
+        if provided_opts["threshold"] is not None:
+            base_p["threshold"] = float(provided_opts["threshold"])
+        eff_mode = "custom"
+        custom_params = base_p
+
     bundle = train_supervised_model(
         task=args.task,
         model_id=mid,
-        mode=args.mode,
+        mode=eff_mode,
+        custom_params=custom_params,
         feature_space=args.feature_space,
         pca_components=args.pca,
         evaluate_test=True,
         splits=splits_arg,
         dataset_name=ds_name,
         source=source,
+        variant_override=run_name,
+        run_name=run_name,
+        store=store,
+        extra_tables_override=extra_tables,
         progress_cb=lambda p, m: print(f"[{p * 100:5.1f}%] {m}"),
     )
-    print(f"\nSaved bundle: {bundle.card.bundle_id}")
+    print(f"\nSaved run '{run_name}' -> bundle: {bundle.card.bundle_id}")
     print(json.dumps(bundle.card.metrics, indent=2))
     return 0
 
 
 def cmd_tune(args: argparse.Namespace) -> int:
     mid = _resolve_model(args.task, args.model)
+    store = get_store()
+    prefix = "tuned" if args.feature_space == "original" else f"tuned_{args.feature_space}"
+    try:
+        run_name, _ = resolve_run_name(args.run_name, prefix=prefix, task=args.task, model_id=mid, store=store)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
     bundle = train_supervised_model(
         task=args.task,
         model_id=mid,
@@ -137,9 +208,12 @@ def cmd_tune(args: argparse.Namespace) -> int:
         feature_space=args.feature_space,
         tune_threshold=(args.task == "classification"),
         evaluate_test=True,
+        variant_override=run_name,
+        run_name=run_name,
+        store=store,
         progress_cb=lambda p, m: print(f"[{p * 100:5.1f}%] {m}"),
     )
-    print(f"\nSaved tuned bundle: {bundle.card.bundle_id}")
+    print(f"\nSaved tuned run '{run_name}' -> bundle: {bundle.card.bundle_id}")
     print("Best params:", json.dumps(bundle.card.params, indent=2))
     print("Metrics:", json.dumps(bundle.card.metrics, indent=2))
     return 0
@@ -147,12 +221,21 @@ def cmd_tune(args: argparse.Namespace) -> int:
 
 def cmd_evaluate(args: argparse.Namespace) -> int:
     store = get_store()
-    bundles = store.list_bundles(task=args.task)
-    if args.model != "all":
-        mid = _resolve_model(args.task, args.model)
-        bundles = [b for b in bundles if b.card.model_id == mid]
+    mid = None if args.model == "all" else _resolve_model(args.task, args.model)
+    try:
+        bundles = find_bundles_by_run_name(store, task=args.task, run_name=args.run_name, model_id=mid)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
     if not bundles:
-        print(f"No saved bundles found for task={args.task}, model={args.model}. Run `build-artifacts` or `train` first.")
+        avail = sorted({b.card.variant for b in store.list_bundles(task=args.task, model_id=mid)})
+        avail_str = ", ".join(avail) if avail else "(none)"
+        print(
+            f"No saved run '{args.run_name}' found for task={args.task}, model={args.model}. "
+            f"Available runs: {avail_str}",
+            file=sys.stderr,
+        )
         return 1
 
     if args.data:
@@ -166,8 +249,8 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
         ev = evaluate_bundle_on_data(b, eval_df)
         rows.append(
             {
+                "run_name": b.card.variant,
                 "bundle_id": b.card.bundle_id,
-                "variant": b.card.variant,
                 "space": b.card.feature_space,
                 "deployed": "*" if b.card.is_deployed else "",
                 **{k: round(ev["metrics"][k], 4) if isinstance(ev["metrics"].get(k), float) else ev["metrics"].get(k) for k in TASK_METRICS[args.task]},
@@ -179,20 +262,46 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
 
 def cmd_cluster(args: argparse.Namespace) -> int:
     mid = _resolve_model("clustering", args.algorithm)
-    fs = "original" if str(args.pca).lower() == "none" else "pca"
-    pca_v = None if fs == "original" else float(args.pca)
-    custom_p = {"n_clusters": args.k, "n_components": args.k} if args.k else None
+    spec = get_spec("clustering", mid)
+    store = get_store()
+
+    provided_opts = {
+        "init": getattr(args, "init", None),
+        "n_init": getattr(args, "n_init", None),
+    }
+    try:
+        model_opts = validate_model_options(spec, provided_opts)
+        fs = "original" if str(args.pca).lower() == "none" else "pca"
+        pca_v = None if fs == "original" else float(args.pca)
+        prefix = args.mode if fs == "pca" else f"{args.mode}_nopca"
+        run_name, _ = resolve_run_name(args.run_name, prefix=prefix, task="clustering", model_id=mid, store=store)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    custom_p: dict = {}
+    if args.k:
+        custom_p["n_clusters"] = args.k
+        custom_p["n_components"] = args.k
+    if provided_opts["init"] is not None:
+        custom_p["init"] = model_opts["init"]
+    if provided_opts["n_init"] is not None:
+        custom_p["n_init"] = int(model_opts["n_init"])
+
     mode = "custom" if custom_p and args.mode == "baseline" else args.mode
 
     bundle = train_clustering_model(
         model_id=mid,
         mode=mode,
-        custom_params=custom_p,
+        custom_params=custom_p or None,
         feature_space=fs,
         pca_components=pca_v,
+        variant_override=run_name,
+        run_name=run_name,
+        store=store,
         progress_cb=lambda p, m: print(f"[{p * 100:5.1f}%] {m}"),
     )
-    print(f"\nSaved clustering bundle: {bundle.card.bundle_id}")
+    print(f"\nSaved clustering run '{run_name}' -> bundle: {bundle.card.bundle_id}")
     print(json.dumps(bundle.card.metrics, indent=2))
     return 0
 
@@ -247,7 +356,10 @@ def cmd_build_artifacts(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="City Hotel Booking Demand — CLI & ML Studio")
-    sub = p.add_subparsers(dest="command", required=True)
+    sub = p.add_subparsers(dest="command", required=False)
+
+    im = sub.add_parser("menu", aliases=["interactive"], help="Launch the interactive CLI menu with in-menu Help")
+    im.set_defaults(func=lambda _args: run_interactive_menu(main))
 
     g = sub.add_parser("gui", help="Launch the interactive Streamlit ML Studio")
     g.add_argument("--port", type=int, default=8501)
@@ -263,11 +375,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     tr = sub.add_parser("train", help="Train a supervised regression or classification model")
     tr.add_argument("--task", choices=["regression", "classification"], required=True)
-    tr.add_argument("--model", required=True, help="Model ID (e.g. linear_regression, random_forest, xgboost, gaussian_nb)")
+    tr.add_argument("--model", required=True, help="Model ID (e.g. linear_regression, gaussian_nb)")
     tr.add_argument("--mode", choices=["baseline", "tuned_preset"], default="baseline")
     tr.add_argument("--feature-space", choices=["original", "pca", "lda"], default="original")
     tr.add_argument("--pca", type=float, default=0.90)
     tr.add_argument("--data", default=None, help="Optional path to custom CSV/XLSX to train on")
+    tr.add_argument("--run-name", default=None, help="Explicit run name (defaults to timestamp; colliding name replaces that run cleanly)")
+    # Model-specific options (validated per model via ModelSpec.cli_options)
+    tr.add_argument("--variants", action="store_true", default=False, help="[linear_regression] Run 5-stage ablation variant tests and fit winning config")
+    tr.add_argument("--with-optional", action="store_true", default=False, help="[linear_regression] Include Test 6 (night features) with --variants")
+    tr.add_argument("--tol", type=float, default=None, help="[linear_regression] Relative RMSE tolerance for --variants (default 0.005)")
+    tr.add_argument("--calibrate", action="store_true", default=False, help="[gaussian_nb] Wrap GaussianNB in 5-fold Sigmoid calibration")
+    tr.add_argument("--var-smoothing", type=float, default=None, help="[gaussian_nb] Override var_smoothing")
+    tr.add_argument("--threshold", type=float, default=None, help="[gaussian_nb] Override decision threshold")
     tr.set_defaults(func=cmd_train)
 
     tu = sub.add_parser("tune", help="Run CV hyperparameter optimization for a supervised model")
@@ -277,11 +397,13 @@ def build_parser() -> argparse.ArgumentParser:
     tu.add_argument("--cv", type=int, default=5)
     tu.add_argument("--n-iter", type=int, default=10)
     tu.add_argument("--feature-space", choices=["original", "pca", "lda"], default="original")
+    tu.add_argument("--run-name", default=None, help="Explicit run name (defaults to timestamp; colliding name replaces that run cleanly)")
     tu.set_defaults(func=cmd_tune)
 
-    ev = sub.add_parser("evaluate", help="Evaluate saved models on val, test, or custom CSV")
+    ev = sub.add_parser("evaluate", help="Evaluate a saved run on val, test, or custom CSV")
     ev.add_argument("--task", choices=["regression", "classification"], required=True)
     ev.add_argument("--model", default="all")
+    ev.add_argument("--run-name", required=True, help="Explicit saved run name to evaluate (or 'all')")
     ev.add_argument("--split", choices=["val", "test"], default="val")
     ev.add_argument("--data", default=None)
     ev.set_defaults(func=cmd_evaluate)
@@ -291,6 +413,10 @@ def build_parser() -> argparse.ArgumentParser:
     cl.add_argument("--mode", choices=["baseline", "tune"], default="baseline")
     cl.add_argument("--k", type=int, default=None)
     cl.add_argument("--pca", default="0.90", help="'none' or float variance ratio like 0.90")
+    cl.add_argument("--run-name", default=None, help="Explicit run name (defaults to timestamp; colliding name replaces that run cleanly)")
+    # Model-specific clustering options (validated per model via ModelSpec.cli_options)
+    cl.add_argument("--init", default=None, help="[kmeans] Centroid initialization ('k-means++' or 'random')")
+    cl.add_argument("--n-init", type=int, default=None, help="[kmeans] Number of centroid initializations")
     cl.set_defaults(func=cmd_cluster)
 
     pr = sub.add_parser("predict", help="Run saved inference pipelines on a preset or CSV file")
@@ -312,6 +438,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.command is None:
+        return run_interactive_menu(main)
     return int(args.func(args))
 
 
