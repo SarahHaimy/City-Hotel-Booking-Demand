@@ -1,0 +1,56 @@
+[server]
+maxUploadSize = 200
+runOnSave = false
+headless = true
+
+[browser]
+gatherUsageStats = false
+
+# ---------------------------------------------------------------------------
+# "Fluted Glass" theme — Travertine canvas, graphite ink, bronze/champagne accent.
+# Mirrors the design tokens in app/components/tokens.py (single source of truth
+# for the custom CSS layer); keep both in sync when adjusting the palette.
+# ---------------------------------------------------------------------------
+[theme]
+base = "light"
+primaryColor = "#8A6A3B"
+backgroundColor = "#F4F0E9"
+secondaryBackgroundColor = "#EAE4D9"
+textColor = "#23211E"
+borderColor = "#DDD5C7"
+linkColor = "#7A5C30"
+codeTextColor = "#4A3F2F"
+codeBackgroundColor = "#EEE7DB"
+font = "Manrope:https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap"
+headingFont = "Plus Jakarta Sans:https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&display=swap"
+codeFont = "IBM Plex Mono:https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+headingFontWeights = 600
+metricValueFontSize = "1.65rem"
+metricValueFontWeight = 600
+baseRadius = "10px"
+buttonRadius = "10px"
+showWidgetBorder = true
+dataframeBorderColor = "#E4DCCE"
+dataframeHeaderBackgroundColor = "#EDE6DA"
+dataframeHeaderTextColor = "#4A453D"
+redColor = "#9B3D33"
+orangeColor = "#B26B3A"
+yellowColor = "#A27427"
+blueColor = "#56707F"
+greenColor = "#4F7356"
+violetColor = "#7A6872"
+grayColor = "#7B756B"
+chartCategoricalColors = ["#2F4550", "#A57A3F", "#6F8A6A", "#B06A50", "#6E8BA0", "#8C7B6B", "#7B5E73", "#C9AE7C"]
+
+[theme.sidebar]
+backgroundColor = "#1D1C1A"
+secondaryBackgroundColor = "#2A2825"
+textColor = "#E8E2D6"
+primaryColor = "#D2B98A"
+borderColor = "#3A3732"
+linkColor = "#D8C094"
+codeTextColor = "#E3D3B0"
+codeBackgroundColor = "#2E2B27"
+
+[client]
+toolbarMode = "minimal"
