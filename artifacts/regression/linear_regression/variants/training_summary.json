@@ -1,7 +1,8 @@
 {
-  "created_at": "2026-11-24T22:53:59+00:00",
-  "run_id": 4,
-  "output_dir": "C:\\Users\\gioay\\Desktop\\giooo\\repos\\City-Hotel-Booking-Demand\\outputs\\regression\\linear_regression\\4",
+  "created_at": "2026-11-26T03:31:08+00:00",
+  "run_id": null,
+  "run_name": "variants",
+  "output_dir": "C:\\Users\\gioay\\Desktop\\giooo\\repos\\City-Hotel-Booking-Demand\\outputs\\regression\\linear_regression\\variants",
   "sklearn_version": "1.9.1",
   "config": {
     "log_target": true,
@@ -19,9 +20,9 @@
     "val_MAE": 13.977382105639938,
     "val_RMSE": 20.227737214214425,
     "val_R2": 0.7360970736931771,
-    "cv_RMSE": 20.40256661210271,
-    "train_time_s": 0.7658547000028193,
+    "train_time_s": 0.7045414000167511,
     "n_train_rows": 36622,
-    "n_features": 141
+    "n_features": 141,
+    "cv_RMSE": 20.40256661210271
   }
 }
