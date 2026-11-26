@@ -22,7 +22,9 @@ src.regression.linear_regression.linear_regression, never run as __main__.
 from __future__ import annotations
 
 import json
+import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -53,11 +55,85 @@ from src.regression.linear_regression.preprocessing import (  # noqa: E402
 SEED = 42
 
 DATA_DIR = ROOT / "data" / "preprocessed"
-OUTPUT_DIR = ROOT / "outputs" / "regression" / "linear_regresssion"
-ARTIFACT_DIR = ROOT / "artifacts" / "regression" / "linear_regresssion"
+BASE_OUTPUT_DIR = ROOT / "outputs" / "regression" / "linear_regression"
+OUTPUT_DIR = BASE_OUTPUT_DIR
+ARTIFACT_DIR = ROOT / "artifacts" / "regression" / "linear_regression"
 MODEL_PATH = ARTIFACT_DIR / "linear_regression.joblib"
 SUMMARY_PATH = ARTIFACT_DIR / "training_summary.json"
 SELECTED_CONFIG_PATH = ARTIFACT_DIR / "selected_config.json"
+
+
+# ----------------------------------------------------------------------------
+# Output directories & run management
+# ----------------------------------------------------------------------------
+def get_next_run_dir(base_dir: Optional[Path] = None, min_run: int = 2) -> Tuple[int, Path]:
+    """Find the next incremental run number (starting at min_run) and create its directory.
+
+    Inspects base_dir for integer-named subdirectories, finds the current maximum,
+    and returns (next_run_id, base_dir / str(next_run_id)).
+    """
+    base = Path(base_dir) if base_dir is not None else BASE_OUTPUT_DIR
+    base.mkdir(parents=True, exist_ok=True)
+    existing_runs = [
+        int(p.name) for p in base.iterdir()
+        if p.is_dir() and p.name.isdigit()
+    ]
+    next_id = max(existing_runs + [min_run - 1]) + 1
+    run_dir = base / str(next_id)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    return next_id, run_dir
+
+
+def new_run_name() -> str:
+    """Return a timestamp suitable for a unique run directory name."""
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+
+
+def _validate_run_name(run_name: str) -> str:
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", run_name):
+        raise ValueError(
+            "run_name must start with a letter or digit and contain only "
+            "letters, digits, periods, underscores, or hyphens"
+        )
+    return run_name
+
+
+def get_latest_run_name(base_dir: Optional[Path] = None) -> Optional[str]:
+    """Return the most recently modified run directory name, if any."""
+    base = Path(base_dir) if base_dir is not None else BASE_OUTPUT_DIR
+    if not base.exists():
+        return None
+    run_dirs = [path for path in base.iterdir() if path.is_dir()]
+    if not run_dirs:
+        return None
+    return max(run_dirs, key=lambda path: path.stat().st_mtime_ns).name
+
+
+def get_run_dir(
+    run_id: Optional[int] = None,
+    base_dir: Optional[Path] = None,
+    run_name: Optional[str] = None,
+) -> Path:
+    """Return a named/numeric run directory, or the latest legacy numeric run."""
+    if run_id is not None and run_name is not None:
+        raise ValueError("specify either run_id or run_name, not both")
+    base = Path(base_dir) if base_dir is not None else BASE_OUTPUT_DIR
+    base.mkdir(parents=True, exist_ok=True)
+    if run_name is not None:
+        run_dir = base / _validate_run_name(run_name)
+        run_dir.mkdir(parents=True, exist_ok=True)
+        return run_dir
+    if run_id is not None:
+        run_dir = base / str(run_id)
+        run_dir.mkdir(parents=True, exist_ok=True)
+        return run_dir
+    existing_runs = [
+        int(p.name) for p in base.iterdir()
+        if p.is_dir() and p.name.isdigit()
+    ]
+    if existing_runs:
+        return base / str(max(existing_runs))
+    return base
 
 
 # ----------------------------------------------------------------------------
@@ -216,28 +292,74 @@ def save_diagnostic_plots(y_true, y_pred, out_dir: Path, prefix: str) -> None:
 # ----------------------------------------------------------------------------
 # Persistence
 # ----------------------------------------------------------------------------
-def save_model(model) -> Path:
+def get_artifact_dir(run_id: Optional[int] = None, run_name: Optional[str] = None) -> Path:
+    """Return the artifact directory for a specific run or root ARTIFACT_DIR."""
+    if run_id is not None and run_name is not None:
+        raise ValueError("specify either run_id or run_name, not both")
+    if run_name is not None:
+        path = ARTIFACT_DIR / _validate_run_name(run_name)
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+    if run_id is not None:
+        path = ARTIFACT_DIR / str(run_id)
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+    ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+    return ARTIFACT_DIR
+
+
+def save_model(model, run_id: Optional[int] = None, run_name: Optional[str] = None) -> Path:
+    """Save a model to a run directory or to the legacy root artifact path."""
+    if run_id is not None and run_name is not None:
+        raise ValueError("specify either run_id or run_name, not both")
+    if run_name is not None:
+        model_path = get_artifact_dir(run_name=run_name) / "linear_regression.joblib"
+        joblib.dump(model, model_path)
+        return model_path
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
     joblib.dump(model, MODEL_PATH)
+    if run_id is not None:
+        run_artifact_dir = get_artifact_dir(run_id)
+        joblib.dump(model, run_artifact_dir / "linear_regression.joblib")
     return MODEL_PATH
 
 
-def load_model():
-    if not MODEL_PATH.exists():
-        raise FileNotFoundError(f"{MODEL_PATH} not found. Run train.py first.")
-    return joblib.load(MODEL_PATH)
+def load_model(run_id: Optional[int] = None, run_name: Optional[str] = None):
+    """Load a run-specific model if specified, else the legacy root MODEL_PATH."""
+    if run_id is not None and run_name is not None:
+        raise ValueError("specify either run_id or run_name, not both")
+    if run_name is not None:
+        target = get_artifact_dir(run_name=run_name) / "linear_regression.joblib"
+    else:
+        target = (get_artifact_dir(run_id) / "linear_regression.joblib") if run_id is not None else MODEL_PATH
+    if not target.exists():
+        raise FileNotFoundError(f"{target} not found. Run train.py first.")
+    return joblib.load(target)
 
 
-def load_summary() -> dict:
-    if not SUMMARY_PATH.exists():
-        raise FileNotFoundError(f"{SUMMARY_PATH} not found. Run train.py first.")
-    return json.loads(SUMMARY_PATH.read_text())
+def load_summary(run_id: Optional[int] = None, run_name: Optional[str] = None) -> dict:
+    """Load a run-specific summary if specified, else the legacy root summary."""
+    if run_id is not None and run_name is not None:
+        raise ValueError("specify either run_id or run_name, not both")
+    if run_name is not None:
+        target = get_artifact_dir(run_name=run_name) / "training_summary.json"
+    else:
+        target = (get_artifact_dir(run_id) / "training_summary.json") if run_id is not None else SUMMARY_PATH
+    if not target.exists():
+        raise FileNotFoundError(f"{target} not found. Run train.py first.")
+    return json.loads(target.read_text())
 
 
-def load_selected_config() -> RegressionConfig:
-    """Config chosen by the variant tests, or the defaults if none was saved."""
-    if SELECTED_CONFIG_PATH.exists():
-        return RegressionConfig.from_dict(json.loads(SELECTED_CONFIG_PATH.read_text()))
+def load_selected_config(run_id: Optional[int] = None, run_name: Optional[str] = None) -> RegressionConfig:
+    """Config chosen by the variant tests, or defaults if none was saved."""
+    if run_id is not None and run_name is not None:
+        raise ValueError("specify either run_id or run_name, not both")
+    if run_name is not None:
+        target = get_artifact_dir(run_name=run_name) / "selected_config.json"
+    else:
+        target = (get_artifact_dir(run_id) / "selected_config.json") if run_id is not None else SELECTED_CONFIG_PATH
+    if target.exists():
+        return RegressionConfig.from_dict(json.loads(target.read_text()))
     return RegressionConfig()
 
 
