@@ -9,6 +9,7 @@ from sklearn.linear_model import LinearRegression
 from src.regression.linear_regression import test as test_module
 from src.regression.linear_regression import train as train_module
 from src.regression.linear_regression.features import RegressionConfig
+from src.regression.linear_regression.train import build_variant_combinations
 from src.regression.linear_regression.linear_regression import (
     get_artifact_dir,
     get_latest_run_name,
@@ -153,3 +154,34 @@ def test_test_entrypoint_selects_and_writes_named_run(tmp_path: Path):
     load_model.assert_called_once_with(run_id=None, run_name="base")
     assert (output_dir / "test_metrics.csv").exists()
     assert (output_dir / "test_predictions.csv").exists()
+
+
+def test_variant_combinations_cover_full_cartesian_product():
+    combinations = build_variant_combinations([1, 2, 3, 4, 5, 6])
+
+    assert len(combinations) == 2 * 3 * 2 * 5 * 4 * 2
+    config_values = {
+        tuple(config.to_dict().items())
+        for _, config in combinations
+    }
+    assert len(config_values) == len(combinations)
+    assert combinations[0][1] == RegressionConfig(
+        log_target=False,
+        iqr_factor=None,
+        seasonality="month",
+        agent_min_frequency=200,
+        use_repeated_guest=False,
+        use_prior_cancel=False,
+        nights="log_share",
+    )
+
+
+def test_variant_combinations_keep_unselected_dimensions_at_defaults():
+    combinations = build_variant_combinations([3, 5])
+
+    assert len(combinations) == 2 * 4
+    for _, config in combinations:
+        assert config.log_target == RegressionConfig.log_target
+        assert config.iqr_factor == RegressionConfig.iqr_factor
+        assert config.agent_min_frequency == RegressionConfig.agent_min_frequency
+        assert config.nights == RegressionConfig.nights

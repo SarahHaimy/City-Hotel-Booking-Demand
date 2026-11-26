@@ -15,23 +15,22 @@ Usage (from the repo root):
         selected_config.json.
 
     python src/regression/linear_regression/train.py --variants
-        Run Tests 1 to 5 in order, one at a time, keeping each winner before the
-        next test, then train the final model with the winners.
-        Add --with-optional to include Test 6 (night features).
-        Add --tests 3 4 to run only some tests. A run that does not start at
-        Test 1 continues from the saved selected config.
+        Exhaustively evaluate the Cartesian product of every option in Tests
+        1 to 6, select the best configuration, and train the final model.
+        Add --tests 3 4 to restrict the search to those dimensions; other
+        dimensions retain their RegressionConfig defaults.
 
     python src/regression/linear_regression/train.py --claims
         Check the assumed drivers of ADR (season, room type) before the report.
 
-Selection rule: lowest validation RMSE on the original ADR scale. Options in
-each test are listed from preferred to least preferred, and a later option only
-wins if it beats the incumbent by more than --tol (relative RMSE, default 0.5%).
-Within that margin the earlier, simpler option is kept.
+Selection rule: lowest validation RMSE on the original ADR scale. If multiple
+combinations are within --tol (relative RMSE, default 0.5%) of the best score,
+the first combination in the preferred option order is kept.
 """
 from __future__ import annotations
 
 import argparse
+from itertools import product
 import json
 import sys
 import time
@@ -64,7 +63,6 @@ from src.regression.linear_regression.features import (  # noqa: E402
     engineer_features,
 )
 from src.regression.linear_regression.linear_regression import (  # noqa: E402
-    ARTIFACT_DIR,
     OUTPUT_DIR,
     SELECTED_CONFIG_PATH,
     SUMMARY_PATH,
@@ -136,7 +134,10 @@ def prepare(cfg: RegressionConfig, train: pd.DataFrame, val: pd.DataFrame):
     return train, val, limits
 
 
-def fit_and_score(cfg: RegressionConfig, train: pd.DataFrame, val: pd.DataFrame):
+def fit_and_score(
+    cfg: RegressionConfig, train: pd.DataFrame, val: pd.DataFrame,
+    include_cv: bool = True,
+):
     """Fit on train, score on val. Returns (row, model, limits, val_rows, val_pred)."""
     train_fit, val_rows, limits = prepare(cfg, train, val)
     X, y = split_xy(train_fit)
@@ -151,11 +152,12 @@ def fit_and_score(cfg: RegressionConfig, train: pd.DataFrame, val: pd.DataFrame)
         "val_MAE": metrics["MAE"],
         "val_RMSE": metrics["RMSE"],
         "val_R2": metrics["R2"],
-        "cv_RMSE": cv_rmse(cfg, train_fit),
         "train_time_s": fit_seconds,
         "n_train_rows": len(train_fit),
         "n_features": len(feature_names(model)),
     }
+    if include_cv:
+        row["cv_RMSE"] = cv_rmse(cfg, train_fit)
     for key in ("MAE", "RMSE", "R2"):
         if f"{key}_in_limits" in metrics:
             row[f"val_{key}_in_limits"] = metrics[f"{key}_in_limits"]
@@ -163,13 +165,31 @@ def fit_and_score(cfg: RegressionConfig, train: pd.DataFrame, val: pd.DataFrame)
 
 
 def choose_winner(results, tol: float) -> int:
-    """Index of the winner. Options come preferred first. A later option replaces
-    the incumbent only if its validation RMSE is lower by more than tol."""
-    best = 0
-    for i in range(1, len(results)):
-        if results[i]["val_RMSE"] < results[best]["val_RMSE"] * (1 - tol):
-            best = i
-    return best
+    """Choose the first preferred config within tol of the best validation RMSE."""
+    best_rmse = min(row["val_RMSE"] for row in results)
+    acceptable_rmse = best_rmse * (1 + tol)
+    return next(
+        i for i, row in enumerate(results)
+        if row["val_RMSE"] <= acceptable_rmse
+    )
+
+
+def build_variant_combinations(tests, base_cfg: Optional[RegressionConfig] = None):
+    """Build the Cartesian product of selected dimensions over config defaults."""
+    cfg = base_cfg or RegressionConfig()
+    dimensions = []
+    for number in tests:
+        name, options = VARIANT_TESTS[number]
+        dimensions.append((name, options))
+
+    combinations = []
+    for selected in product(*(options for _, options in dimensions)):
+        labels = {dimensions[i][0]: selected[i][0] for i in range(len(dimensions))}
+        config = cfg
+        for _, overrides in selected:
+            config = replace(config, **overrides)
+        combinations.append((labels, config))
+    return combinations
 
 
 # ----------------------------------------------------------------------------
@@ -182,63 +202,51 @@ def run_variant_tests(
     out_dir = Path(output_dir) if output_dir is not None else OUTPUT_DIR
     if run_id is not None and run_name is not None:
         raise ValueError("specify either run_id or run_name, not both")
-    if run_name is not None:
-        run_config_path = get_artifact_dir(run_name=run_name) / "selected_config.json"
-    elif run_id is not None:
-        run_config_path = get_artifact_dir(run_id) / "selected_config.json"
-    else:
-        run_config_path = SELECTED_CONFIG_PATH
-    if min(tests) == 1:
-        cfg = RegressionConfig()
-    elif run_config_path.exists():
-        cfg = load_selected_config(run_id=run_id, run_name=run_name)
-        print(f"Continuing from saved selected config: {cfg.to_dict()}")
-    elif run_name is not None and SELECTED_CONFIG_PATH.exists():
-        cfg = load_selected_config()
-        print(f"Continuing from saved selected config: {cfg.to_dict()}")
-    else:
-        cfg = RegressionConfig()
-        print("No saved selected config, starting from defaults.")
-
     out_dir.mkdir(parents=True, exist_ok=True)
-    ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
     if run_name is not None:
         artifact_run_dir = get_artifact_dir(run_name=run_name)
     elif run_id is not None:
         artifact_run_dir = get_artifact_dir(run_id)
     else:
         artifact_run_dir = None
-    summary_rows = []
 
-    for number in tests:
-        name, options = VARIANT_TESTS[number]
-        rows = []
-        for label, overrides in options:
-            row, *_ = fit_and_score(replace(cfg, **overrides), train, val)
-            rows.append({"variant": label, **row})
-            print(f"  test {number} {label}: val RMSE {row['val_RMSE']:.3f}")
-
-        winner = choose_winner(rows, tol)
-        for i, row in enumerate(rows):
-            row["selected"] = i == winner
-        table = pd.DataFrame(rows)
-        table.to_csv(out_dir / f"test{number}_{name}.csv", index=False)
-
-        cfg = replace(cfg, **options[winner][1])
-        config_json = json.dumps(cfg.to_dict(), indent=2)
-        config_path = (
-            artifact_run_dir / "selected_config.json"
-            if artifact_run_dir is not None
-            else SELECTED_CONFIG_PATH
+    combinations = build_variant_combinations(tests)
+    print(f"Evaluating {len(combinations)} variant combinations.")
+    rows = []
+    configs = []
+    for index, (labels, cfg) in enumerate(combinations, start=1):
+        metrics, *_ = fit_and_score(cfg, train, val, include_cv=False)
+        rows.append({"combination": index, **labels, **metrics})
+        configs.append(cfg)
+        print(
+            f"  {index}/{len(combinations)}: validation RMSE "
+            f"{metrics['val_RMSE']:.3f}"
         )
-        config_path.write_text(config_json)
-        summary_rows.append({"test": number, "name": name, "winner": options[winner][0],
-                             "val_RMSE": rows[winner]["val_RMSE"]})
-        print(f"\nTest {number}: {name}")
-        print(table.to_string(index=False, float_format=lambda v: f"{v:.4f}"))
-        print(f"Winner: {options[winner][0]}\n")
 
-    pd.DataFrame(summary_rows).to_csv(out_dir / "variant_summary.csv", index=False)
+    winner = choose_winner(rows, tol)
+    rows[winner]["selected"] = True
+    for index, row in enumerate(rows):
+        row.setdefault("selected", False)
+        row["rank"] = 1 + sum(
+            other["val_RMSE"] < row["val_RMSE"] for other in rows
+        )
+    table = pd.DataFrame(rows).sort_values(["rank", "combination"])
+    table.to_csv(out_dir / "variant_summary.csv", index=False)
+
+    cfg = configs[winner]
+    config_json = json.dumps(cfg.to_dict(), indent=2)
+    config_path = (
+        artifact_run_dir / "selected_config.json"
+        if artifact_run_dir is not None
+        else SELECTED_CONFIG_PATH
+    )
+    config_path.write_text(config_json)
+    print(
+        f"Selected combination {rows[winner]['combination']} "
+        f"(validation RMSE {rows[winner]['val_RMSE']:.3f}; "
+        f"rank {rows[winner]['rank']})"
+    )
+    print(f"Selected config: {cfg.to_dict()}")
     return cfg
 
 
@@ -361,12 +369,14 @@ def check_claims(train, val, output_dir: Optional[Path] = None) -> None:
 def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--variants", action="store_true", help="run the variant tests first")
+    parser.add_argument("--variants", action="store_true",
+                        help="exhaustively evaluate all selected variant combinations")
     parser.add_argument("--tests", type=int, nargs="+", choices=sorted(VARIANT_TESTS),
-                        help="which tests to run (default 1 to 5)")
-    parser.add_argument("--with-optional", action="store_true", help="also run Test 6")
+                        help="which dimensions to include in the grid (default: all 1 to 6)")
+    parser.add_argument("--with-optional", action="store_true",
+                        help="legacy alias; Test 6 is included by default")
     parser.add_argument("--tol", type=float, default=NOISE_TOL,
-                        help="relative RMSE margin a later option must beat (default 0.005)")
+                        help="relative RMSE tolerance for preferring earlier grid options (default 0.005)")
     parser.add_argument("--claims", action="store_true", help="check the driver claims and exit")
     parser.add_argument("--run", type=int, default=None,
                         help="legacy numeric run ID")
@@ -404,9 +414,10 @@ def main(argv=None) -> None:
         return
 
     if args.variants:
-        tests = sorted(args.tests) if args.tests else [1, 2, 3, 4, 5]
+        tests = sorted(set(args.tests)) if args.tests else sorted(VARIANT_TESTS)
         if args.with_optional and 6 not in tests:
             tests.append(6)
+            tests.sort()
         cfg = run_variant_tests(
             train, val, tests, args.tol, output_dir=run_dir,
             run_id=run_id, run_name=run_name,
