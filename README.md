@@ -94,7 +94,7 @@ City-Hotel-Booking-Demand/
 │           ├── test_metrics.csv              # Test evaluation metrics (MAE, RMSE, R2)
 │           ├── test_predicted_vs_actual.png  # Diagnostic parity plot on test split
 │           ├── test_residuals_vs_predicted.png # Residual analysis plot
-│           └── variant_summary.csv           # Ablation comparison across all test phases
+│           └── variant_summary.csv           # Exhaustive variant-combination scores and ranking
 ├── src/
 │   ├── classification/                       # Classification track (cancellation prediction)
 │   │   ├── bayes_preprocessing.py            # Feature definitions and encoding functions
@@ -206,15 +206,25 @@ python -c "from src.data.loader import load_h2; from src.data.data_cleaning impo
 ### 4. Running the Regression Track (ADR)
 
 ```bash
-# Run ablation variant tests (Tests 1-5) and select optimal feature config
-python src/regression/linear_regression/train.py --variants
+# Exhaustively compare combinations across Tests 1-6 as a named run
+python src/regression/linear_regression/train.py --variants --run-name tuned
 
-# Train the final pipeline using the selected configuration
-python src/regression/linear_regression/train.py
+# Train the untuned default RegressionConfig, independent of selected_config.json
+python src/regression/linear_regression/train.py --base --run-name base
 
-# Evaluate on the unseen test split and generate parity/residual plots
-python src/regression/linear_regression/test.py
+# Evaluate that run on the unseen test split; results are saved beside the run
+python src/regression/linear_regression/test.py --run-name base
 ```
+
+The full variant grid evaluates 480 combinations. Use `--tests 3 5` to search
+only selected dimensions while keeping all other settings at their defaults.
+The best configuration is selected by validation RMSE; `--tol` prefers the
+first option-order combination when it is within the tolerance of the best.
+
+Each training run writes to `outputs/regression/linear_regression/<run_name>/`
+and `artifacts/regression/linear_regression/<run_name>/`. If `--run-name` is
+omitted from training, a UTC timestamp is used. Testing without `--run-name`
+selects the most recently modified artifact run.
 
 ### 5. Running the Classification Track (Cancellation)
 
