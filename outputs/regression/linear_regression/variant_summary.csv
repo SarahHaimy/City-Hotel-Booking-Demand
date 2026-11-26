@@ -1,0 +1,7 @@
+test,name,winner,val_RMSE
+1,target_transform,log_adr,20.48290226211319
+2,outlier_filter,no_filter,20.48290226211319
+3,seasonality,month_onehot,20.48290226211319
+4,agent_grouping,min_freq_10,20.22836256944502
+5,flags,repeated_guest_only,20.227737214214425
+6,night_features,log_total_plus_share,20.227737214214425

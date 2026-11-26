@@ -1,0 +1,38 @@
+import numpy as np
+import pandas as pd
+
+# leakage columns (to be removed from features)
+OUTCOME_COLS      = ["IsCanceled", "ReservationStatus", "ReservationStatusDate"]
+OUTCOME_PROXY     = ["DepositType"]
+POST_BOOKING_COLS = ["AssignedRoomType", "BookingChanges", "DaysInWaitingList"]
+FORBIDDEN = set(OUTCOME_COLS + OUTCOME_PROXY + POST_BOOKING_COLS)
+
+FEATURE_SET = {
+    "num": ["LeadTime", "TotalNights", "TotalGuests", "ADR", "TotalOfSpecialRequests"],
+    "bin": ["HasChildren", "HasParking", "IsRepeatedGuest"],
+    "cat": ["MarketSegment", "CustomerType", "Meal"],
+}
+
+def add_engineered_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Deterministic row-wise features: nothing is learned from the data, so no leakage."""
+    out = df.copy()
+
+    out["Children"] = pd.to_numeric(out["Children"], errors="coerce").fillna(0)
+    out["TotalNights"] = out["StaysInWeekendNights"] + out["StaysInWeekNights"]
+    out["TotalGuests"] = out["Adults"] + out["Children"] + out["HasBabies"]
+    out["HasChildren"] = ((out["Children"] + out["HasBabies"]) > 0).astype(int)
+    out["HasParking"]  = (out["RequiredCarParkingSpaces"] > 0).astype(int)
+    # out["IsDomestic"]  = (out["Country"] == "PRT").astype(int)   # under review, might add
+    return out
+
+def get_feature_frame(df: pd.DataFrame):
+    fs = FEATURE_SET
+    cols = fs["num"] + fs["bin"] + fs["cat"]
+
+    # check for leakage
+    leaked = FORBIDDEN & set(cols)
+    assert not leaked, f"Leakage risk, forbidden columns in feature set: {leaked}"
+
+    X = add_engineered_features(df)[cols]
+    assert X.isna().sum().sum() == 0, "Unexpected NaNs in clustering features"
+    return X, fs

@@ -1,0 +1,34 @@
+{
+  "k": 3,
+  "silhouette": 0.1801972924324068,
+  "davies_bouldin": 1.7631495582776384,
+  "calinski_harabasz": 11518.793916813625,
+  "inertia": 208232.1299510839,
+  "n_iter": 23,
+  "min_cluster_pct": 0.22202683588822203,
+  "cluster_sizes": [
+    21703,
+    11616,
+    18999
+  ],
+  "train_time_sec": 4.273,
+  "config": "baseline",
+  "params": {
+    "algorithm": "lloyd",
+    "copy_x": true,
+    "init": "k-means++",
+    "max_iter": 300,
+    "n_clusters": 3,
+    "n_init": 10,
+    "random_state": 42,
+    "tol": 0.0001,
+    "verbose": 0
+  },
+  "pca_n_components": 0.9,
+  "pca_components_kept": 7,
+  "pca_variance_kept": 0.9063047112888365,
+  "pca_explained_variance_2d": [
+    0.30331015992589827,
+    0.21929152157479204
+  ]
+}

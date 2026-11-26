@@ -13,3 +13,6 @@ seaborn==0.13.2
 six==1.17.0
 tzdata==2026.6
 pytest==7.4.2
+scikit-learn==1.9.1
+joblib==1.6.0
+scipy==1.18.1

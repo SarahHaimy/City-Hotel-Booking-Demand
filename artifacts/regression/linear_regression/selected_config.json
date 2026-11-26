@@ -1,0 +1,10 @@
+{
+  "log_target": true,
+  "iqr_factor": null,
+  "seasonality": "month",
+  "nights": "log_share",
+  "agent_min_frequency": 10,
+  "other_min_frequency": 20,
+  "use_repeated_guest": true,
+  "use_prior_cancel": false
+}
