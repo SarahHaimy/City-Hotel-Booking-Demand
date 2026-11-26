@@ -1,0 +1,111 @@
+{
+  "bundle_id": "regression/linear_regression/baseline",
+  "model_id": "linear_regression",
+  "task": "regression",
+  "variant": "baseline",
+  "display_name": "Linear Regression (OLS)",
+  "family": "linear",
+  "source": "project",
+  "run_name": "Linear Regression (OLS) (baseline)",
+  "track_origin": "milestone_1",
+  "is_deployed": false,
+  "selection_criterion": "Lowest val RMSE",
+  "params": {
+    "log_target": false,
+    "seasonality": "month",
+    "nights": "log_share",
+    "agent_min_frequency": 50,
+    "other_min_frequency": 20,
+    "use_repeated_guest": true,
+    "use_prior_cancel": true
+  },
+  "feature_space": "original",
+  "pca_info": {
+    "requested_components": null
+  },
+  "inputs": [
+    "ArrivalDateYear",
+    "ArrivalDateMonth",
+    "ArrivalDateDayOfMonth",
+    "LeadTime",
+    "StaysInWeekendNights",
+    "StaysInWeekNights",
+    "Adults",
+    "Children",
+    "Meal",
+    "MarketSegment",
+    "DistributionChannel",
+    "ReservedRoomType",
+    "DepositType",
+    "CustomerType",
+    "Agent",
+    "IsRepeatedGuest",
+    "PreviousCancellations"
+  ],
+  "forbidden_checked": [
+    "ADR",
+    "IsCanceled",
+    "ReservationStatus",
+    "ReservationStatusDate",
+    "AssignedRoomType",
+    "BookingChanges",
+    "DaysInWaitingList",
+    "TotalOfSpecialRequests",
+    "HasBabies",
+    "RequiredCarParkingSpaces"
+  ],
+  "preprocessing_steps": [
+    "engineer",
+    "preprocess",
+    "regressor"
+  ],
+  "target": "ADR",
+  "threshold": null,
+  "supports_proba": false,
+  "supports_predict_new": true,
+  "metrics": {
+    "val": {
+      "MAE": 14.793056881555495,
+      "MSE": 434.01071035522637,
+      "RMSE": 20.832923711165133,
+      "MedAE": 11.373396779595467,
+      "R2": 0.7200696113516236,
+      "n_rows": 7848
+    },
+    "cv": {
+      "RMSE_mean": 20.94238686551368,
+      "RMSE_std": 0.3447202260668916,
+      "folds": 5
+    },
+    "test": {
+      "MAE": 14.620780795873388,
+      "MSE": 438.307953797145,
+      "RMSE": 20.93580554450067,
+      "MedAE": 11.148377392623203,
+      "R2": 0.7268769350396793,
+      "n_rows": 7848
+    }
+  },
+  "tuning_summary": null,
+  "train_time_s": 1.2556,
+  "n_train_rows": 36622,
+  "n_features_out": 99,
+  "sampling_info": null,
+  "data_version": {
+    "dataset_name": "H2 City Hotel (official splits)",
+    "split_dir": "data/preprocessed",
+    "sha256_train": "57717da4dff1dedf",
+    "cleaning_flags": {
+      "drop_zero_adr": true,
+      "drop_company": true,
+      "keep_zero_nights": false
+    }
+  },
+  "notes": "",
+  "seed": 42,
+  "sklearn_version": "1.9.1",
+  "python_version": "3.14.4",
+  "git_commit": "5b52858",
+  "created_at": "2026-11-25T21:01:54.803487+00:00",
+  "schema_version": 1
+}

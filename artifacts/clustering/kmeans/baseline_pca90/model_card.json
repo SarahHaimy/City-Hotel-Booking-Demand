@@ -1,0 +1,111 @@
+{
+  "bundle_id": "clustering/kmeans/baseline_pca90",
+  "model_id": "kmeans",
+  "task": "clustering",
+  "variant": "baseline_pca90",
+  "display_name": "K-Means Clustering",
+  "family": "centroid",
+  "source": "project",
+  "run_name": "K-Means Clustering (baseline_pca90)",
+  "track_origin": "milestone_1",
+  "is_deployed": true,
+  "selection_criterion": "Highest internal Silhouette score (unsupervised)",
+  "params": {
+    "n_clusters": 3,
+    "init": "k-means++",
+    "n_init": 10,
+    "max_iter": 300
+  },
+  "feature_space": "pca",
+  "pca_info": {
+    "requested_components": 0.9,
+    "components_kept": 7,
+    "variance_kept": 0.9063047112888365,
+    "explained_variance_ratio": [
+      0.27489142692261187,
+      0.1987449391489314,
+      0.14345640847588076,
+      0.10618185404237586,
+      0.0890618068050735,
+      0.057429351126437225,
+      0.03653892476752596
+    ]
+  },
+  "inputs": [
+    "LeadTime",
+    "StaysInWeekendNights",
+    "StaysInWeekNights",
+    "Adults",
+    "Children",
+    "ADR",
+    "RequiredCarParkingSpaces",
+    "TotalOfSpecialRequests",
+    "IsRepeatedGuest",
+    "MarketSegment",
+    "CustomerType",
+    "Meal"
+  ],
+  "forbidden_checked": [
+    "AssignedRoomType",
+    "BookingChanges",
+    "DaysInWaitingList",
+    "DepositType",
+    "IsCanceled",
+    "ReservationStatus",
+    "ReservationStatusDate"
+  ],
+  "preprocessing_steps": [
+    "engineer",
+    "prep",
+    "pca",
+    "clusterer"
+  ],
+  "target": null,
+  "threshold": null,
+  "supports_proba": false,
+  "supports_predict_new": true,
+  "metrics": {
+    "train": {
+      "n_clusters": 3,
+      "n_rows": 52318,
+      "noise_count": 0,
+      "noise_pct": 0.0,
+      "cluster_sizes": [
+        21703,
+        11616,
+        18999
+      ],
+      "cluster_size_map": {
+        "0": 21703,
+        "1": 11616,
+        "2": 18999
+      },
+      "min_cluster_pct": 0.22202683588822203,
+      "silhouette": 0.18019729243241014,
+      "davies_bouldin": 1.7631495582776378,
+      "calinski_harabasz": 11518.793916813627,
+      "inertia": 208232.12995108293
+    }
+  },
+  "tuning_summary": null,
+  "train_time_s": 0.4942,
+  "n_train_rows": 52318,
+  "n_features_out": 7,
+  "sampling_info": null,
+  "data_version": {
+    "dataset_name": "H2 City Hotel (cleaned)",
+    "sha256_train": "0bf5d9a0715e8a69",
+    "cleaning_flags": {
+      "drop_zero_adr": true,
+      "drop_company": true,
+      "keep_zero_nights": false
+    }
+  },
+  "notes": "",
+  "seed": 42,
+  "sklearn_version": "1.9.1",
+  "python_version": "3.14.4",
+  "git_commit": "5b52858",
+  "created_at": "2026-11-25T23:44:47.186976+00:00",
+  "schema_version": 1
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "cluster": 0,
+    "title": "Mid-Lead \u00b7 Premium-ADR \u00b7 Family / Leisure Party",
+    "size": 21703,
+    "size_pct": 41.5,
+    "posthoc_cancel_rate": 0.298,
+    "summary": "41.5% of bookings \u2014 avg lead time 89 days, 3.4 nights, 2.45 guests, \u20ac134/night ADR, 1.31 special requests (primary channel: Online TA)."
+  },
+  {
+    "cluster": 1,
+    "title": "Short-Lead \u00b7 Standard-Rate \u00b7 Short-Stay Business / Repeat",
+    "size": 11616,
+    "size_pct": 22.2,
+    "posthoc_cancel_rate": 0.161,
+    "summary": "22.2% of bookings \u2014 avg lead time 11 days, 1.7 nights, 1.52 guests, \u20ac104/night ADR, 0.48 special requests (primary channel: Online TA)."
+  },
+  {
+    "cluster": 2,
+    "title": "Long-Lead \u00b7 Budget-Conscious \u00b7 Online TA Travelers",
+    "size": 18999,
+    "size_pct": 36.3,
+    "posthoc_cancel_rate": 0.4,
+    "summary": "36.3% of bookings \u2014 avg lead time 108 days, 3.8 nights, 1.86 guests, \u20ac95/night ADR, 0.17 special requests (primary channel: Online TA)."
+  }
+]
