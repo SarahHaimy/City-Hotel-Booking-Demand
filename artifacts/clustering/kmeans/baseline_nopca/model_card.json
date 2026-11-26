@@ -1,0 +1,98 @@
+{
+  "bundle_id": "clustering/kmeans/baseline_nopca",
+  "model_id": "kmeans",
+  "task": "clustering",
+  "variant": "baseline_nopca",
+  "display_name": "K-Means Clustering",
+  "family": "centroid",
+  "source": "project",
+  "run_name": "K-Means Clustering (baseline_nopca)",
+  "track_origin": "milestone_1",
+  "is_deployed": false,
+  "selection_criterion": "Highest internal Silhouette score (unsupervised)",
+  "params": {
+    "n_clusters": 3,
+    "init": "k-means++",
+    "n_init": 10
+  },
+  "feature_space": "original",
+  "pca_info": {
+    "requested_components": null
+  },
+  "inputs": [
+    "LeadTime",
+    "StaysInWeekendNights",
+    "StaysInWeekNights",
+    "Adults",
+    "Children",
+    "ADR",
+    "RequiredCarParkingSpaces",
+    "TotalOfSpecialRequests",
+    "IsRepeatedGuest",
+    "MarketSegment",
+    "CustomerType",
+    "Meal"
+  ],
+  "forbidden_checked": [
+    "AssignedRoomType",
+    "BookingChanges",
+    "DaysInWaitingList",
+    "DepositType",
+    "IsCanceled",
+    "ReservationStatus",
+    "ReservationStatusDate"
+  ],
+  "preprocessing_steps": [
+    "engineer",
+    "prep",
+    "clusterer"
+  ],
+  "target": null,
+  "threshold": null,
+  "supports_proba": false,
+  "supports_predict_new": true,
+  "metrics": {
+    "train": {
+      "n_clusters": 3,
+      "n_rows": 52318,
+      "noise_count": 0,
+      "noise_pct": 0.0,
+      "cluster_sizes": [
+        21362,
+        11620,
+        19336
+      ],
+      "cluster_size_map": {
+        "0": 21362,
+        "1": 11620,
+        "2": 19336
+      },
+      "min_cluster_pct": 0.22210329141022211,
+      "silhouette": 0.1594222535246887,
+      "davies_bouldin": 1.9100126140936695,
+      "calinski_harabasz": 10035.764585326671,
+      "inertia": 239173.71724652802
+    }
+  },
+  "tuning_summary": null,
+  "train_time_s": 0.9054,
+  "n_train_rows": 52318,
+  "n_features_out": 22,
+  "sampling_info": null,
+  "data_version": {
+    "dataset_name": "H2 City Hotel (cleaned)",
+    "sha256_train": "0bf5d9a0715e8a69",
+    "cleaning_flags": {
+      "drop_zero_adr": true,
+      "drop_company": true,
+      "keep_zero_nights": false
+    }
+  },
+  "notes": "",
+  "seed": 42,
+  "sklearn_version": "1.9.1",
+  "python_version": "3.14.4",
+  "git_commit": "5b52858",
+  "created_at": "2026-11-25T21:14:22.582711+00:00",
+  "schema_version": 1
+}

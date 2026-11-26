@@ -1,0 +1,5 @@
+{
+  "regression": "regression/linear_regression/variant_selected",
+  "clustering": "clustering/kmeans/baseline_pca90",
+  "classification": "classification/gaussian_nb/tuned"
+}

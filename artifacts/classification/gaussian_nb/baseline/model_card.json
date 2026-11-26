@@ -1,0 +1,114 @@
+{
+  "bundle_id": "classification/gaussian_nb/baseline",
+  "model_id": "gaussian_nb",
+  "task": "classification",
+  "variant": "baseline",
+  "display_name": "Gaussian Naive Bayes",
+  "family": "bayes",
+  "source": "project",
+  "run_name": "Gaussian Naive Bayes (baseline)",
+  "track_origin": "milestone_1",
+  "is_deployed": false,
+  "selection_criterion": "Highest val F1",
+  "params": {
+    "var_smoothing": 1e-09,
+    "calibrate": false,
+    "threshold": 0.5
+  },
+  "feature_space": "original",
+  "pca_info": {
+    "requested_components": null
+  },
+  "inputs": [
+    "LeadTime",
+    "ArrivalDateMonth",
+    "StaysInWeekNights",
+    "StaysInWeekendNights",
+    "Adults",
+    "Children",
+    "ReservedRoomType",
+    "Meal",
+    "MarketSegment",
+    "IsRepeatedGuest",
+    "PreviousCancellations",
+    "PreviousBookingsNotCanceled",
+    "CustomerType"
+  ],
+  "forbidden_checked": [
+    "IsCanceled",
+    "ReservationStatus",
+    "ReservationStatusDate",
+    "AssignedRoomType",
+    "BookingChanges",
+    "DaysInWaitingList",
+    "DepositType"
+  ],
+  "preprocessing_steps": [
+    "sanitize",
+    "preprocess",
+    "classifier"
+  ],
+  "target": "IsCanceled",
+  "threshold": 0.5,
+  "supports_proba": true,
+  "supports_predict_new": true,
+  "metrics": {
+    "val": {
+      "Accuracy": 0.5518708547115505,
+      "Precision": 0.38515625,
+      "Recall": 0.81995841995842,
+      "F1": 0.5241196013289037,
+      "threshold": 0.5,
+      "TN": 2438,
+      "FP": 3148,
+      "FN": 433,
+      "TP": 1972,
+      "n_rows": 7991,
+      "ROC_AUC": 0.6753970611113468,
+      "PR_AUC": 0.44076722701487814,
+      "Brier": 0.40878790282248845
+    },
+    "cv": {
+      "F1_mean": 0.5156413216344763,
+      "F1_std": 0.004416113609263262,
+      "folds": 5
+    },
+    "test": {
+      "Accuracy": 0.5382305093229883,
+      "Precision": 0.37399490096097276,
+      "Recall": 0.7929313929313929,
+      "F1": 0.5082622601279317,
+      "threshold": 0.5,
+      "TN": 2394,
+      "FP": 3192,
+      "FN": 498,
+      "TP": 1907,
+      "n_rows": 7991,
+      "ROC_AUC": 0.6612766323292639,
+      "PR_AUC": 0.43524635035297643,
+      "Brier": 0.4194046779326587
+    }
+  },
+  "tuning_summary": null,
+  "train_time_s": 0.1272,
+  "n_train_rows": 37289,
+  "n_features_out": 43,
+  "sampling_info": null,
+  "data_version": {
+    "dataset_name": "H2 City Hotel (official splits)",
+    "split_dir": "data/bayes",
+    "sha256_train": "9e7cbc56f0291737",
+    "cleaning_flags": {
+      "drop_zero_adr": false,
+      "drop_company": true,
+      "keep_zero_nights": true
+    }
+  },
+  "notes": "",
+  "seed": 42,
+  "sklearn_version": "1.9.1",
+  "python_version": "3.14.4",
+  "git_commit": "5b52858",
+  "created_at": "2026-11-25T21:12:18.335239+00:00",
+  "schema_version": 1
+}

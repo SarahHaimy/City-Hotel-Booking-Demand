@@ -1,0 +1,49 @@
+# Project-wide configuration. Read by src/config.py (GUI, CLI and services).
+# Paths are relative to the repository root.
+
+seed: 42
+
+paths:
+  raw_data: data/H2.csv
+  artifacts: artifacts
+  user_artifacts: artifacts/user
+  outputs: outputs
+  experiments_log: outputs/experiments/results.csv
+  runs: runs
+  samples: data/samples
+
+# Split folders used by each supervised task (all are 70/15/15, stratified on IsCanceled).
+splits:
+  regression: data/preprocessed        # clean_data(drop_zero_adr=True)
+  classification: data/bayes           # clean_data(drop_zero_adr=False, keep_zero_nights=True)
+
+# Cleaning flags that produced each task's data (recorded in every model card).
+cleaning:
+  regression: {drop_zero_adr: true, drop_company: true, keep_zero_nights: false}
+  classification: {drop_zero_adr: false, drop_company: true, keep_zero_nights: true}
+  clustering: {drop_zero_adr: true, drop_company: true, keep_zero_nights: false}
+
+# Model-selection criterion per task (validation split, never test).
+selection:
+  regression: {metric: RMSE, split: val, higher_is_better: false}
+  classification: {metric: F1, split: val, higher_is_better: true}
+  clustering: {metric: silhouette, split: train, higher_is_better: true}
+
+# Defaults for long-running jobs started from the GUI / CLI.
+jobs:
+  max_parallel: 1
+  default_cv_folds: 5
+  default_n_iter: 20
+  default_timeout_s: 1800
+
+# Row caps used when an algorithm is expensive on the full data.
+sampling:
+  slow_model_rows: 15000
+  agglomerative_rows: 6000
+  dbscan_rows: 12000
+  silhouette_rows: 10000
+  scatter_points: 8000
+
+app:
+  title: City Hotel Booking Demand — ML Studio
+  max_upload_mb: 200

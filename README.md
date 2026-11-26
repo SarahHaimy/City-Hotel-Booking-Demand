@@ -153,7 +153,41 @@ source venv/bin/activate       # Windows: .\venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Exploratory Data Analysis (EDA)
+### 2. Launch the Interactive GUI (Streamlit + Plotly ML Studio)
+
+```bash
+# Build all official baseline, tuned, and PCA/LDA artifact bundles (first run or fresh clone)
+python main.py build-artifacts
+
+# Launch the multipage GUI application
+python main.py gui
+# Equivalent direct command:
+streamlit run app/streamlit_app.py
+```
+
+The GUI exposes 11 integrated workspaces:
+- **Home & Deployed Models**: Active inference pipelines, validation/test KPIs, and track readiness matrix.
+- **Data Explorer & Anti-Leakage Audit**: Interactive H2 profiling, `clean_data()` step audit, stratified split verification, and 31-variable leakage timing matrix.
+- **Model Catalog, Compare & Tuning Lab**: Architecture specs, baseline-vs-tuned leaderboards, Plotly ROC/PR/calibration/parity/residual overlays, CV stability boxplots, and search-space trial landscapes.
+- **Predict, Batch Evaluate & Train Studio**: Single-booking prediction + What-If simulator, CSV/XLSX batch scoring & shift-aware evaluation, and custom-data model training/tuning persisted across sessions in `artifacts/user/`.
+- **Clustering, PCA/LDA & Artifacts**: K-Means / GMM / Agglomerative (Ward dendrogram) / DBSCAN guest personas, 90% PCA scree & 1D LDA projections, bundle ZIP import/export, and background job history.
+
+See [`docs/MODEL_CONTRACT.md`](docs/MODEL_CONTRACT.md) for registering new models, [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) for the full CLI reference, and [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) for the live demonstration walkthrough.
+
+### 3. Unified CLI Reference (`main.py`)
+
+```bash
+python main.py list-models
+python main.py analyze
+python main.py train --task regression --model linear_regression
+python main.py train --task classification --model gaussian_nb
+python main.py tune  --task classification --model gaussian_nb
+python main.py evaluate --task classification --model all --split val
+python main.py cluster --algorithm kmeans --pca 0.90
+python main.py predict --task all
+```
+
+### 4. Exploratory Data Analysis (Direct Script)
 
 Run the automated EDA suite to generate summary statistics, distribution plots, and correlation matrices under `outputs/eda/`:
 

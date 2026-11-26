@@ -9,5 +9,10 @@ __pycache__/
 .venv/
 
 src/__pycache__
-
 temp
+
+# GUI / job runner state (user-trained models and job logs stay local)
+runs/
+artifacts/user/
+node_modules/
+app/frontend_src/node_modules/

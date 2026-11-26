@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="fgFrame" x1="6" y1="4" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2E2B26"/>
+      <stop offset="55%" stop-color="#1E1C19"/>
+      <stop offset="100%" stop-color="#151311"/>
+    </linearGradient>
+    <linearGradient id="fgBevel" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E8D9BE" stop-opacity="0.65"/>
+      <stop offset="45%" stop-color="#C6A874" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#8A6A3B" stop-opacity="0.45"/>
+    </linearGradient>
+    <linearGradient id="fgChampagne" x1="16" y1="14" x2="48" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F3EADB"/>
+      <stop offset="50%" stop-color="#D8C094"/>
+      <stop offset="100%" stop-color="#A5844F"/>
+    </linearGradient>
+    <linearGradient id="fgFluteHighlight" x1="0" y1="14" x2="0" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FAF5EC" stop-opacity="0.34"/>
+      <stop offset="100%" stop-color="#C6A874" stop-opacity="0.08"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Smoked graphite architectural glass tile -->
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#fgFrame)" stroke="url(#fgBevel)" stroke-width="1.4"/>
+  <rect x="4.5" y="4.5" width="55" height="55" rx="12.5" stroke="#FAF5EC" stroke-opacity="0.08" stroke-width="0.8"/>
+
+  <!-- Subtle vertical fluted-glass ribs across background -->
+  <line x1="12" y1="7" x2="12" y2="57" stroke="#FAF5EC" stroke-opacity="0.05" stroke-width="1"/>
+  <line x1="18" y1="7" x2="18" y2="57" stroke="#FAF5EC" stroke-opacity="0.06" stroke-width="1"/>
+  <line x1="24" y1="7" x2="24" y2="57" stroke="#FAF5EC" stroke-opacity="0.05" stroke-width="1"/>
+  <line x1="30" y1="7" x2="30" y2="57" stroke="#FAF5EC" stroke-opacity="0.06" stroke-width="1"/>
+  <line x1="36" y1="7" x2="36" y2="57" stroke="#FAF5EC" stroke-opacity="0.05" stroke-width="1"/>
+  <line x1="42" y1="7" x2="42" y2="57" stroke="#FAF5EC" stroke-opacity="0.06" stroke-width="1"/>
+  <line x1="48" y1="7" x2="48" y2="57" stroke="#FAF5EC" stroke-opacity="0.05" stroke-width="1"/>
+  <line x1="52" y1="7" x2="52" y2="57" stroke="#FAF5EC" stroke-opacity="0.04" stroke-width="1"/>
+
+  <!-- Reeded glass monoliths (three stepped hospitality bays) -->
+  <path d="M15 48V20L27 15V48" fill="url(#fgFluteHighlight)" fill-opacity="0.38"/>
+  <path d="M27 48V24L40 19.5V48" fill="url(#fgFluteHighlight)" fill-opacity="0.22"/>
+  <path d="M40 48V29.5L49 26.5V48" fill="url(#fgFluteHighlight)" fill-opacity="0.14"/>
+
+  <!-- Crisp champagne-bronze architectural mullions -->
+  <path d="M15 48V20L27 15V48" stroke="url(#fgChampagne)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M27 48V24L40 19.5V48" stroke="#E8E2D6" stroke-opacity="0.88" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M40 48V29.5L49 26.5V48" stroke="#C6A874" stroke-opacity="0.78" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Interior vertical flutes inside towers -->
+  <line x1="19" y1="20.5" x2="19" y2="47.5" stroke="#FAF5EC" stroke-opacity="0.42" stroke-width="1.1"/>
+  <line x1="23" y1="18.8" x2="23" y2="47.5" stroke="#D8C094" stroke-opacity="0.52" stroke-width="1.1"/>
+  <line x1="31.5" y1="24.2" x2="31.5" y2="47.5" stroke="#E8E2D6" stroke-opacity="0.34" stroke-width="1.05"/>
+  <line x1="35.8" y1="22.8" x2="35.8" y2="47.5" stroke="#E8E2D6" stroke-opacity="0.28" stroke-width="1.05"/>
+  <line x1="44.5" y1="29.8" x2="44.5" y2="47.5" stroke="#C6A874" stroke-opacity="0.34" stroke-width="1"/>
+
+  <!-- Grounded travertine plinth -->
+  <line x1="11.5" y1="48.2" x2="52.5" y2="48.2" stroke="url(#fgChampagne)" stroke-width="2" stroke-linecap="round"/>
+</svg>
