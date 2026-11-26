@@ -10,6 +10,10 @@ Usage (from the repo root):
         Train the final model with the saved selected config (defaults if none)
         and write validation metrics, plots and the joblib pipeline.
 
+    python src/regression/linear_regression/train.py --base --run-name base
+        Train the untuned default RegressionConfig without reading or writing
+        selected_config.json.
+
     python src/regression/linear_regression/train.py --variants
         Run Tests 1 to 5 in order, one at a time, keeping each winner before the
         next test, then train the final model with the winners.
@@ -70,10 +74,10 @@ from src.regression.linear_regression.linear_regression import (  # noqa: E402
     evaluate,
     feature_names,
     get_artifact_dir,
-    get_next_run_dir,
     get_run_dir,
     load_selected_config,
     load_split,
+    new_run_name,
     save_diagnostic_plots,
     save_model,
     split_xy,
@@ -172,13 +176,25 @@ def choose_winner(results, tol: float) -> int:
 # Variant tests
 # ----------------------------------------------------------------------------
 def run_variant_tests(
-    train, val, tests, tol: float, output_dir: Optional[Path] = None, run_id: Optional[int] = None
+    train, val, tests, tol: float, output_dir: Optional[Path] = None,
+    run_id: Optional[int] = None, run_name: Optional[str] = None,
 ) -> RegressionConfig:
     out_dir = Path(output_dir) if output_dir is not None else OUTPUT_DIR
+    if run_id is not None and run_name is not None:
+        raise ValueError("specify either run_id or run_name, not both")
+    if run_name is not None:
+        run_config_path = get_artifact_dir(run_name=run_name) / "selected_config.json"
+    elif run_id is not None:
+        run_config_path = get_artifact_dir(run_id) / "selected_config.json"
+    else:
+        run_config_path = SELECTED_CONFIG_PATH
     if min(tests) == 1:
         cfg = RegressionConfig()
-    elif SELECTED_CONFIG_PATH.exists():
-        cfg = load_selected_config(run_id=run_id)
+    elif run_config_path.exists():
+        cfg = load_selected_config(run_id=run_id, run_name=run_name)
+        print(f"Continuing from saved selected config: {cfg.to_dict()}")
+    elif run_name is not None and SELECTED_CONFIG_PATH.exists():
+        cfg = load_selected_config()
         print(f"Continuing from saved selected config: {cfg.to_dict()}")
     else:
         cfg = RegressionConfig()
@@ -186,7 +202,12 @@ def run_variant_tests(
 
     out_dir.mkdir(parents=True, exist_ok=True)
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
-    artifact_run_dir = get_artifact_dir(run_id) if run_id is not None else None
+    if run_name is not None:
+        artifact_run_dir = get_artifact_dir(run_name=run_name)
+    elif run_id is not None:
+        artifact_run_dir = get_artifact_dir(run_id)
+    else:
+        artifact_run_dir = None
     summary_rows = []
 
     for number in tests:
@@ -205,9 +226,12 @@ def run_variant_tests(
 
         cfg = replace(cfg, **options[winner][1])
         config_json = json.dumps(cfg.to_dict(), indent=2)
-        SELECTED_CONFIG_PATH.write_text(config_json)
-        if artifact_run_dir is not None:
-            (artifact_run_dir / "selected_config.json").write_text(config_json)
+        config_path = (
+            artifact_run_dir / "selected_config.json"
+            if artifact_run_dir is not None
+            else SELECTED_CONFIG_PATH
+        )
+        config_path.write_text(config_json)
         summary_rows.append({"test": number, "name": name, "winner": options[winner][0],
                              "val_RMSE": rows[winner]["val_RMSE"]})
         print(f"\nTest {number}: {name}")
@@ -222,8 +246,12 @@ def run_variant_tests(
 # Final model
 # ----------------------------------------------------------------------------
 def train_final(
-    cfg: RegressionConfig, train, val, output_dir: Optional[Path] = None, run_id: Optional[int] = None
+    cfg: RegressionConfig, train, val, output_dir: Optional[Path] = None,
+    run_id: Optional[int] = None, run_name: Optional[str] = None,
+    save_selected_config: bool = True,
 ) -> None:
+    if run_id is not None and run_name is not None:
+        raise ValueError("specify either run_id or run_name, not both")
     out_dir = Path(output_dir) if output_dir is not None else OUTPUT_DIR
     row, model, limits, val_rows, val_pred = fit_and_score(cfg, train, val)
     assert_no_leakage(feature_names(model))
@@ -233,10 +261,11 @@ def train_final(
     coefficient_table(model).to_csv(out_dir / "coefficients.csv", index=False)
     save_diagnostic_plots(val_rows[TARGET], val_pred, out_dir, "validation")
 
-    model_path = save_model(model, run_id=run_id)
+    model_path = save_model(model, run_id=run_id, run_name=run_name)
     summary = {
         "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "run_id": run_id,
+        "run_name": run_name,
         "output_dir": str(out_dir),
         "sklearn_version": sklearn.__version__,
         "config": cfg.to_dict(),
@@ -245,11 +274,22 @@ def train_final(
         "validation_metrics": row,
     }
     summary_json = json.dumps(summary, indent=2)
-    SUMMARY_PATH.write_text(summary_json)
-    if run_id is not None:
+    if run_name is not None:
+        artifact_run_dir = get_artifact_dir(run_name=run_name)
+        (artifact_run_dir / "training_summary.json").write_text(summary_json)
+        if save_selected_config:
+            (artifact_run_dir / "selected_config.json").write_text(
+                json.dumps(cfg.to_dict(), indent=2)
+            )
+    elif run_id is not None:
         artifact_run_dir = get_artifact_dir(run_id)
         (artifact_run_dir / "training_summary.json").write_text(summary_json)
-        (artifact_run_dir / "selected_config.json").write_text(json.dumps(cfg.to_dict(), indent=2))
+        if save_selected_config:
+            (artifact_run_dir / "selected_config.json").write_text(
+                json.dumps(cfg.to_dict(), indent=2)
+            )
+    else:
+        SUMMARY_PATH.write_text(summary_json)
 
     print("Final model, validation metrics (original ADR scale)")
     for key in ("val_MAE", "val_RMSE", "val_R2", "cv_RMSE", "train_time_s"):
@@ -329,18 +369,35 @@ def main(argv=None) -> None:
                         help="relative RMSE margin a later option must beat (default 0.005)")
     parser.add_argument("--claims", action="store_true", help="check the driver claims and exit")
     parser.add_argument("--run", type=int, default=None,
-                        help="explicit run number to write to (default: auto-increment starting from 2)")
+                        help="legacy numeric run ID")
+    parser.add_argument("--run-name", default=None,
+                        help="name for this run's output and artifact folders (default: UTC timestamp)")
+    parser.add_argument("--base", action="store_true",
+                        help="train the untuned default RegressionConfig without reading or writing selected_config.json")
     args = parser.parse_args(argv)
+
+    if args.run is not None and args.run_name is not None:
+        parser.error("--run and --run-name cannot be used together")
+    if args.base and args.variants:
+        parser.error("--base cannot be combined with --variants")
 
     train, val = load_split("train"), load_split("val")
 
-    if args.run is not None:
+    if args.run_name is not None:
+        run_id = None
+        run_name = args.run_name
+        run_dir = get_run_dir(run_name=run_name)
+    elif args.run is not None:
         run_id = args.run
+        run_name = None
         run_dir = get_run_dir(run_id)
     else:
-        run_id, run_dir = get_next_run_dir()
+        run_id = None
+        run_name = new_run_name()
+        run_dir = get_run_dir(run_name=run_name)
 
-    print(f"Target run directory: {run_dir} (run {run_id})")
+    run_label = f"run {run_id}" if run_id is not None else f"run '{run_name}'"
+    print(f"Target run directory: {run_dir} ({run_label})")
 
     if args.claims:
         check_claims(train, val, output_dir=run_dir)
@@ -350,11 +407,24 @@ def main(argv=None) -> None:
         tests = sorted(args.tests) if args.tests else [1, 2, 3, 4, 5]
         if args.with_optional and 6 not in tests:
             tests.append(6)
-        cfg = run_variant_tests(train, val, tests, args.tol, output_dir=run_dir, run_id=run_id)
-    else:
+        cfg = run_variant_tests(
+            train, val, tests, args.tol, output_dir=run_dir,
+            run_id=run_id, run_name=run_name,
+        )
+    elif args.base:
+        cfg = RegressionConfig()
+    elif run_id is not None:
         cfg = load_selected_config(run_id=run_id)
+    elif run_name is not None:
+        run_config_path = get_artifact_dir(run_name=run_name) / "selected_config.json"
+        cfg = load_selected_config(run_name=run_name) if run_config_path.exists() else load_selected_config()
+    else:
+        cfg = load_selected_config()
 
-    train_final(cfg, train, val, output_dir=run_dir, run_id=run_id)
+    train_final(
+        cfg, train, val, output_dir=run_dir, run_id=run_id,
+        run_name=run_name, save_selected_config=not args.base,
+    )
 
 
 if __name__ == "__main__":

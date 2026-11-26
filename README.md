@@ -172,15 +172,20 @@ python -c "from src.data.loader import load_h2; from src.data.data_cleaning impo
 ### 4. Running the Regression Track (ADR)
 
 ```bash
-# Run ablation variant tests (Tests 1-5) and select optimal feature config
-python src/regression/linear_regression/train.py --variants
+# Run ablation variant tests (Tests 1-5) as a named run
+python src/regression/linear_regression/train.py --variants --run-name tuned
 
-# Train the final pipeline using the selected configuration
-python src/regression/linear_regression/train.py
+# Train the untuned default RegressionConfig, independent of selected_config.json
+python src/regression/linear_regression/train.py --base --run-name base
 
-# Evaluate on the unseen test split and generate parity/residual plots
-python src/regression/linear_regression/test.py
+# Evaluate that run on the unseen test split; results are saved beside the run
+python src/regression/linear_regression/test.py --run-name base
 ```
+
+Each training run writes to `outputs/regression/linear_regression/<run_name>/`
+and `artifacts/regression/linear_regression/<run_name>/`. If `--run-name` is
+omitted from training, a UTC timestamp is used. Testing without `--run-name`
+selects the most recently modified artifact run.
 
 ### 5. Running the Classification Track (Cancellation)
 

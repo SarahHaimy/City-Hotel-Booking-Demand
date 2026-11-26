@@ -11,8 +11,10 @@ Usage (from the repo root):
 
 Reads the pipeline saved by train.py, scores every paying booking (ADR > 0) in
 the test split, and writes metrics and diagnostic plots to
-outputs/regression/linear/. When the selected config uses an IQR filter, a
-secondary set of metrics is added for test rows inside the training limits.
+outputs/regression/linear_regression/<run_name>/. Pass --run-name to select a
+specific training run; otherwise the most recently modified artifact run is
+used. When the selected config uses an IQR filter, a secondary set of metrics
+is added for test rows inside the training limits.
 """
 from __future__ import annotations
 
@@ -28,9 +30,10 @@ if str(ROOT) not in sys.path:
 
 from src.regression.linear_regression.features import TARGET  # noqa: E402
 from src.regression.linear_regression.linear_regression import (  # noqa: E402
-    OUTPUT_DIR,
+    ARTIFACT_DIR,
     evaluate,
     get_run_dir,
+    get_latest_run_name,
     load_model,
     load_split,
     load_summary,
@@ -43,15 +46,27 @@ def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--run", type=int, default=None,
-                        help="explicit run number to write to (defaults to model's run_id or latest run)")
+                        help="legacy numeric run ID")
+    parser.add_argument("--run-name", default=None,
+                        help="name of the training run to evaluate (default: latest artifact run)")
     args = parser.parse_args(argv)
 
-    summary = load_summary(run_id=args.run)
-    model = load_model(run_id=args.run)
+    if args.run is not None and args.run_name is not None:
+        parser.error("--run and --run-name cannot be used together")
+
+    run_id = args.run
+    run_name = args.run_name
+    if run_id is None and run_name is None:
+        run_name = get_latest_run_name(ARTIFACT_DIR)
+
+    summary = load_summary(run_id=run_id, run_name=run_name)
+    model = load_model(run_id=run_id, run_name=run_name)
     limits = tuple(summary["iqr_limits"]) if summary.get("iqr_limits") else None
 
-    if args.run is not None:
-        run_dir = get_run_dir(args.run)
+    if run_name is not None:
+        run_dir = get_run_dir(run_name=run_name)
+    elif run_id is not None:
+        run_dir = get_run_dir(run_id)
     elif summary.get("output_dir") and Path(summary["output_dir"]).exists():
         run_dir = Path(summary["output_dir"])
     elif summary.get("run_id") is not None:
